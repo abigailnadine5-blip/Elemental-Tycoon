@@ -1,0 +1,29 @@
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        "players": {
+          ".read": true,
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "!newData.exists() || (newData.hasChildren(['n', 'e', 'x', 'y', 'z']) && newData.child('n').isString() && newData.child('n').val().length <= 20)"
+          }
+        },
+        "plots": {
+          ".read": true,
+          "$plot": {
+            ".write": "auth != null && (!data.exists() || data.child('owner').val() === auth.uid)",
+            ".validate": "!newData.exists() || newData.child('owner').val() === auth.uid"
+          }
+        },
+        "chat": {
+          ".read": true,
+          "$msg": {
+            ".write": "auth != null && !data.exists()",
+            ".validate": "newData.child('uid').val() === auth.uid && newData.child('m').isString() && newData.child('m').val().length <= 120"
+          }
+        }
+      }
+    }
+  }
+}

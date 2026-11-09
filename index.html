@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Elemental Tycoon 3D</title>
+  <meta name="description" content="Game tycoon 3D elemental — pilih elemenmu, bangun markas, jadi yang terkaya!" />
+  <meta name="theme-color" content="#0b1020" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ============ MENU UTAMA ============ -->
+  <section id="menu" class="screen">
+    <div class="menu-box">
+      <div class="logo">
+        <span class="logo-icons">🔥💧🍃⚡🤖🌋</span>
+        <h1>ELEMENTAL<br /><span>TYCOON</span></h1>
+        <p class="tag">Pilih elemenmu. Bangun markasmu. Jadi yang terkaya!</p>
+      </div>
+      <input id="nameInput" maxlength="16" placeholder="Nama pemain..." autocomplete="off" />
+      <button id="startBtn" class="btn big">▶ START</button>
+      <button id="howBtn" class="btn ghost">❓ Cara Main</button>
+      <div id="howPanel" class="how hidden">
+        <p><b>WASD / Joystick</b> — jalan · <b>Shift</b> — lari · <b>Spasi</b> — lompat</p>
+        <p><b>Drag mouse / layar kanan</b> — putar kamera · <b>Scroll</b> — zoom</p>
+        <p><b>E</b> — skill elemen · <b>Enter</b> — chat · <b>R</b> — kembali ke markas</p>
+        <p>Injak <b style="color:#7dff9b">tombol hijau</b> untuk membeli dropper &amp; upgrade. Ore berjalan di conveyor ke collector,
+          lalu injak <b style="color:#ffd54f">pad uang</b> untuk mengambil uangmu.</p>
+      </div>
+      <div id="netInfo" class="net-info"></div>
+    </div>
+  </section>
+
+  <!-- ============ PILIH ELEMEN ============ -->
+  <section id="select" class="screen hidden">
+    <div class="select-panel">
+      <div class="select-top">
+        <button id="backBtn" class="btn ghost small">← Kembali</button>
+        <h2>Pilih Elemenmu</h2>
+      </div>
+      <div id="elementGrid" class="el-grid"></div>
+      <div id="elementDetail" class="el-detail"><p class="muted">Klik salah satu elemen untuk melihat kekuatannya.</p></div>
+      <button id="playBtn" class="btn big" disabled>🎮 MAIN!</button>
+    </div>
+  </section>
+
+  <!-- ============ HUD ============ -->
+  <section id="hud" class="hidden">
+    <div class="hud-tl">
+      <div class="cash-box">
+        <div id="cash">$0</div>
+        <div id="income">+$0/dtk</div>
+        <div id="rebirth"></div>
+      </div>
+      <div id="elBadge" class="el-badge"><span id="elIcon"></span><div><b id="elName"></b><small id="elPassive"></small></div></div>
+      <div id="boosts" class="boosts"></div>
+    </div>
+    <div class="hud-tr">
+      <div class="top-btns">
+        <button id="chatBtn" class="btn ghost small hidden" title="Chat (Enter)">💬</button>
+        <button id="muteBtn" class="btn ghost small" title="Suara">🔊</button>
+        <button id="exitBtn" class="btn ghost small" title="Keluar ke menu">⏏</button>
+      </div>
+      <div id="netStatus" class="net-status"></div>
+      <div id="leaderboard" class="leaderboard"></div>
+    </div>
+    <div id="toasts" class="toasts"></div>
+    <div class="chat">
+      <div id="chatLog" class="chat-log"></div>
+      <input id="chatInput" class="hidden" maxlength="120" placeholder="Ketik pesan lalu Enter..." autocomplete="off" />
+    </div>
+    <button id="abilityBtn" class="ability ready">
+      <span id="abIcon"></span>
+      <span id="abName"></span>
+      <span class="key">E</span>
+      <span id="abCd" class="cd"></span>
+    </button>
+    <button id="btnJump" class="touch-btn jump">⤒</button>
+    <div id="joystick" class="joystick"><div id="joyKnob"></div></div>
+    <div id="help" class="help">
+      <button id="helpClose">✕</button>
+      <b>Kontrol:</b> WASD jalan · Shift lari · Spasi lompat · Drag mouse putar kamera · E skill · R ke markas · Enter chat
+    </div>
+  </section>
+
+  <div id="loading" class="loading"><div class="spinner"></div><p id="loadingText">Memuat dunia...</p></div>
+  <noscript>Game ini butuh JavaScript.</noscript>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
