@@ -195,5 +195,5 @@ export function createWorld(scene, renderer, quality) {
     obelisks.forEach((o, i) => { o.position.y = 3.8 + Math.sin(t * 2 + i) * 0.15; o.rotation.y += dt; });
   }
 
-  return { update, sun, sunDir };
+  return { update, sun, sunDir, isFree };
 }

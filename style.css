@@ -120,23 +120,27 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .chat-line { background: rgba(0,0,0,.45); padding: 3px 9px; border-radius: 8px; font-size: 14px; font-weight: 700; width: fit-content; max-width: 100%; word-break: break-word; }
 #chatInput { text-align: left; font-size: 15px; padding: 9px 12px; }
 
-.ability {
-  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); width: 230px; height: 64px; border-radius: 18px;
-  border: 2px solid color-mix(in srgb, var(--c) 70%, white 30%); color: #fff; cursor: pointer; overflow: hidden;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 70%, #000 30%), color-mix(in srgb, var(--c) 35%, #000 65%));
-  display: flex; align-items: center; gap: 10px; padding: 0 14px; font-family: 'Nunito', sans-serif;
-  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+.powerbar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.power {
+  position: relative; width: 168px; height: 62px; border-radius: 16px; overflow: hidden; cursor: pointer; color: #fff;
+  border: 2px solid color-mix(in srgb, var(--c) 70%, white 30%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 70%, #000 30%), color-mix(in srgb, var(--c) 30%, #000 70%));
+  display: flex; align-items: center; gap: 8px; padding: 0 10px; font-family: 'Nunito', sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.4);
 }
-.ability.ready { animation: glow 1.4s infinite alternate; }
-@keyframes glow { to { box-shadow: 0 0 22px var(--c), 0 8px 24px rgba(0,0,0,.4); } }
-.ability::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.6); transform-origin: left; transform: scaleX(var(--p, 0)); pointer-events: none; }
-#abIcon { font-size: 30px; position: relative; z-index: 1; }
-.ability:not(.ready) #abName, .ability:not(.ready) #abIcon { opacity: .3; }
-#abName { font: 400 19px 'Lilita One', sans-serif; letter-spacing: .5px; flex: 1; text-align: left; position: relative; z-index: 1; }
-.ability .key { background: rgba(255,255,255,.2); border-radius: 6px; padding: 1px 8px; font-weight: 900; position: relative; z-index: 1; }
-.ability .cd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 400 30px 'Lilita One', sans-serif; z-index: 2; text-shadow: 0 2px 4px #000; }
+.power.ult { background: linear-gradient(180deg, #ffd54f, color-mix(in srgb, var(--c) 45%, #3a2a00 55%)); border-color: #ffe082; }
+.power.ready { animation: glow 1.4s infinite alternate; }
+.power.active { animation: pulse .4s infinite alternate; box-shadow: 0 0 30px #ffd54f; }
+@keyframes glow { to { box-shadow: 0 0 20px var(--c), 0 8px 24px rgba(0,0,0,.4); } }
+.power::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.62); transform-origin: left; transform: scaleX(var(--p, 0)); pointer-events: none; }
+.power:not(.ready) .p-icon, .power:not(.ready) .p-name { opacity: .35; }
+.p-icon { font-size: 26px; position: relative; z-index: 1; }
+.p-name { font: 400 15px/1.05 'Lilita One', sans-serif; letter-spacing: .3px; flex: 1; text-align: left; position: relative; z-index: 1; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.power .key { background: rgba(255,255,255,.22); border-radius: 6px; padding: 1px 7px; font-weight: 900; font-size: 13px; position: relative; z-index: 1; }
+.power .cd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 400 26px 'Lilita One', sans-serif; z-index: 2; text-shadow: 0 2px 4px #000; pointer-events: none; }
+.boosts span.ult { background: rgba(255,213,79,.3); border-color: #ffd54f; }
+.boosts span.safe { background: rgba(128,216,255,.18); border-color: rgba(128,216,255,.6); color: #e1f5fe; animation: none; }
 
-.help { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--line); padding: 7px 34px 7px 14px; border-radius: 12px; font-size: 13px; white-space: nowrap; pointer-events: auto; }
+.help { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--line); padding: 7px 34px 7px 14px; border-radius: 12px; font-size: 13px; white-space: nowrap; pointer-events: auto; }
 .help button { position: absolute; right: 6px; top: 4px; background: none; border: 0; color: #fff; cursor: pointer; font-size: 14px; }
 
 /* ---------- kontrol sentuh ---------- */
@@ -150,7 +154,12 @@ body.touch .touch-btn { display: flex; }
 .joystick.on { display: block; }
 #joyKnob { position: absolute; left: 35px; top: 35px; width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,.45); }
 body.touch .help { display: none; }
-body.touch .ability { left: auto; right: 18px; transform: none; bottom: 18px; width: 190px; height: 60px; }
+body.touch .powerbar { left: auto; right: 12px; transform: none; bottom: 12px; display: grid; grid-template-columns: auto auto; gap: 8px; }
+body.touch .power { width: 74px; height: 74px; border-radius: 50%; flex-direction: column; justify-content: center; gap: 0; padding: 0; }
+body.touch .p-name, body.touch .power .key { display: none; }
+body.touch .p-icon { font-size: 30px; }
+body.touch #btnAttack { grid-row: span 2; width: 96px; height: 96px; align-self: end; }
+body.touch .touch-btn.jump { right: 120px; bottom: 12px; width: 70px; height: 70px; }
 body.touch .chat { bottom: 90px; }
 
 /* ---------- loading ---------- */

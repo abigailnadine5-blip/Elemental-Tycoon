@@ -47,6 +47,19 @@ export const sfx = {
   error() { tone(160, 0.25, 'sawtooth', 0.06, 110); },
   jump() { tone(300, 0.12, 'sine', 0.06, 600); },
   click() { tone(700, 0.05, 'triangle', 0.06); },
+  hit() { noise(0.3, 0.3, 300); tone(140, 0.25, 'square', 0.06, 70); },
+  ult() { tone(220, 0.9, 'sawtooth', 0.08, 880); tone(330, 0.9, 'triangle', 0.08, 1320, 0.1); noise(1.2, 0.3, 700); },
+  attack(id) {
+    switch (id) {
+      case 'listrik': noise(0.25, 0.3, 3000); break;
+      case 'cahaya': tone(1200, 0.3, 'sine', 0.07, 2400); break;
+      case 'techno': tone(1400, 0.12, 'square', 0.04, 300); break;
+      case 'gempa': noise(0.35, 0.3, 200); break;
+      case 'air': noise(0.3, 0.2, 1200); break;
+      case 'logam': tone(900, 0.15, 'triangle', 0.06, 1800); break;
+      default: noise(0.28, 0.22, 900); tone(500, 0.15, 'sine', 0.04, 250);
+    }
+  },
   ability(id) {
     switch (id) {
       case 'listrik': noise(0.5, 0.35, 2500); tone(90, 0.4, 'sawtooth', 0.08, 40); break;

@@ -36,7 +36,9 @@
       <div id="howPanel" class="how hidden">
         <p><b>WASD / Joystick</b> — jalan · <b>Shift</b> — lari · <b>Spasi</b> — lompat</p>
         <p><b>Drag mouse / layar kanan</b> — putar kamera · <b>Scroll</b> — zoom</p>
-        <p><b>E</b> — skill elemen · <b>Enter</b> — chat · <b>R</b> — kembali ke markas</p>
+        <p><b>Q / klik</b> — serangan elemen · <b>E</b> — skill tycoon · <b>F</b> — ultimate (bisa terbang)</p>
+        <p><b>Enter</b> — chat · <b>R</b> — kembali ke markas</p>
+        <p>Beli <b>Lantai 2, Lantai 3 &amp; Rooftop</b> lalu naik tangga di samping markas. Hancurkan 💎 Kristal Elemen di padang rumput untuk bonus uang!</p>
         <p>Injak <b style="color:#7dff9b">tombol hijau</b> untuk membeli dropper &amp; upgrade. Ore berjalan di conveyor ke collector,
           lalu injak <b style="color:#ffd54f">pad uang</b> untuk mengambil uangmu.</p>
       </div>
@@ -82,17 +84,16 @@
       <div id="chatLog" class="chat-log"></div>
       <input id="chatInput" class="hidden" maxlength="120" placeholder="Ketik pesan lalu Enter..." autocomplete="off" />
     </div>
-    <button id="abilityBtn" class="ability ready">
-      <span id="abIcon"></span>
-      <span id="abName"></span>
-      <span class="key">E</span>
-      <span id="abCd" class="cd"></span>
-    </button>
+    <div class="powerbar">
+      <button id="btnAttack" class="power ready"><span class="p-icon" id="atkIcon"></span><span class="p-name" id="atkName"></span><span class="key">Q</span><span id="atkCd" class="cd"></span></button>
+      <button id="abilityBtn" class="power ready"><span class="p-icon" id="abIcon"></span><span class="p-name" id="abName"></span><span class="key">E</span><span id="abCd" class="cd"></span></button>
+      <button id="btnUlt" class="power ult ready"><span class="p-icon" id="ultIcon"></span><span class="p-name" id="ultName"></span><span class="key">F</span><span id="ultCd" class="cd"></span></button>
+    </div>
     <button id="btnJump" class="touch-btn jump">⤒</button>
     <div id="joystick" class="joystick"><div id="joyKnob"></div></div>
     <div id="help" class="help">
       <button id="helpClose">✕</button>
-      <b>Kontrol:</b> WASD jalan · Shift lari · Spasi lompat · Drag mouse putar kamera · E skill · R ke markas · Enter chat
+      <b>Kontrol:</b> WASD jalan · Spasi lompat · Drag mouse kamera · <b>Q/klik</b> serang · <b>E</b> skill · <b>F</b> ultimate (tahan Spasi = terbang) · R ke markas
     </div>
   </section>
 

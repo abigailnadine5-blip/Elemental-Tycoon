@@ -33,7 +33,7 @@ export class Input {
         joyEl.classList.add('on');
         return;
       }
-      active.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      active.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), mouse: e.pointerType === 'mouse' && e.button === 0 });
     });
     canvas.addEventListener('pointermove', (e) => {
       if (e.pointerId === joyId) {
@@ -57,6 +57,8 @@ export class Input {
         knob.style.transform = '';
         joyEl.classList.remove('on');
       }
+      const p = active.get(e.pointerId);
+      if (p && p.mouse && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 6 && performance.now() - p.t < 300) this.pressed.add('Click');
       active.delete(e.pointerId);
     };
     canvas.addEventListener('pointerup', end);
@@ -73,6 +75,8 @@ export class Input {
     };
     btn('btnJump', 'Space');
     btn('abilityBtn', 'KeyE');
+    btn('btnAttack', 'KeyQ');
+    btn('btnUlt', 'KeyF');
   }
 
   down(...codes) { return this.enabled && codes.some((c) => this.keys.has(c)); }

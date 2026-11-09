@@ -121,3 +121,36 @@ export function passive(el, key) {
 }
 
 export const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+
+// ---------------------------------------------------------------------
+// POWER: Serangan [Q] & Ultimate [F] tiap elemen
+// kind: 'proj' (proyektil) atau 'beam' (sinar instan)
+// ---------------------------------------------------------------------
+const ATTACKS = {
+  api: { name: 'Bola Api', kind: 'proj', shape: 'sphere', speed: 32, gravity: 2, size: 0.45, cooldown: 1.1, color: 0xff5a00, explode: 1.4 },
+  air: { name: 'Peluru Air', kind: 'proj', shape: 'water', speed: 30, gravity: 6, size: 0.4, cooldown: 0.9, color: 0x29b6f6, explode: 1.0 },
+  daun: { name: 'Pisau Daun', kind: 'proj', shape: 'leaf', speed: 34, gravity: 0, size: 0.5, cooldown: 0.9, multi: 3, color: 0x7cff5a, explode: 0.6 },
+  listrik: { name: 'Sambar Petir', kind: 'beam', range: 45, cooldown: 1.1, color: 0xfff27a, style: 'bolt' },
+  techno: { name: 'Laser Plasma', kind: 'proj', shape: 'laser', speed: 70, gravity: 0, size: 0.15, cooldown: 0.5, color: 0x00e5ff, explode: 0.7 },
+  gempa: { name: 'Lempar Batu', kind: 'proj', shape: 'rock', speed: 24, gravity: 18, up: 7, size: 0.7, cooldown: 1.4, color: 0x8d6e63, explode: 2.2, quake: true },
+  es: { name: 'Tombak Es', kind: 'proj', shape: 'shard', speed: 45, gravity: 0, size: 0.35, cooldown: 0.8, color: 0xb3f0ff, explode: 0.9 },
+  angin: { name: 'Pusaran Angin', kind: 'proj', shape: 'tornado', speed: 14, gravity: 0, size: 0.9, cooldown: 1.6, life: 2.6, color: 0xe0f2f1, explode: 1.6, pierce: true },
+  cahaya: { name: 'Sinar Suci', kind: 'beam', range: 50, cooldown: 1.0, color: 0xfff6c0, style: 'ray' },
+  bayangan: { name: 'Orb Bayangan', kind: 'proj', shape: 'orb', speed: 22, gravity: 0, size: 0.5, cooldown: 1.2, homing: true, color: 0x7c4dff, explode: 1.4 },
+  racun: { name: 'Bom Racun', kind: 'proj', shape: 'bomb', speed: 20, gravity: 14, up: 6, size: 0.45, cooldown: 1.4, color: 0x76ff03, explode: 2.0, cloud: true },
+  logam: { name: 'Shuriken Baja', kind: 'proj', shape: 'disc', speed: 40, gravity: 0, size: 0.4, cooldown: 0.6, color: 0xcfd8dc, explode: 0.6 },
+};
+
+const ULTS = {
+  api: 'Wujud Phoenix', air: 'Raja Samudra', daun: 'Penjaga Hutan', listrik: 'Dewa Petir',
+  techno: 'Mode Mecha', gempa: 'Titan Bumi', es: 'Ratu Salju', angin: 'Badai Langit',
+  cahaya: 'Malaikat Cahaya', bayangan: 'Raja Kegelapan', racun: 'Wabah Hijau', logam: 'Ksatria Baja',
+};
+
+for (const e of ELEMENTS) {
+  e.attack = { life: 1.6, ...ATTACKS[e.id] };
+  e.ult = {
+    name: ULTS[e.id], duration: 12, cooldown: 70,
+    text: 'Berubah wujud 12 detik: bisa TERBANG (tahan Spasi), dropper & nilai ore x1.5, serangan tanpa jeda',
+  };
+}

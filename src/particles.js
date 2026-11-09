@@ -153,6 +153,18 @@ export class Effects {
     this.items.push({ obj: line, t: 0, dur: 0.35, kind: 'fade' });
   }
 
+  beam(from, to, color = 0xffffff, width = 0.3) {
+    const len = from.distanceTo(to);
+    const geo = new THREE.CylinderGeometry(width, width, len, 10, 1, true);
+    geo.translate(0, len / 2, 0);
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(3), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(from);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+    this.scene.add(m);
+    this.items.push({ obj: m, t: 0, dur: 0.45, kind: 'beam' });
+  }
+
   shockwave(pos, color, radius = 14) {
     const geo = new THREE.RingGeometry(0.8, 1.2, 64);
     const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.5), transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -170,6 +182,7 @@ export class Effects {
       const r = it.t / it.dur;
       it.obj.material.opacity = Math.max(0, 1 - r);
       if (it.kind === 'ring') it.obj.scale.setScalar(1 + r * it.radius);
+      if (it.kind === 'beam') { const w = Math.max(0.05, 1 - r); it.obj.scale.set(w, 1, w); }
       if (r >= 1) {
         this.scene.remove(it.obj);
         it.obj.geometry.dispose(); it.obj.material.dispose();

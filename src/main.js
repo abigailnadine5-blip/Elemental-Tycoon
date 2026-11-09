@@ -8,9 +8,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ELEMENTS, getElement, passive, hex } from './elements.js';
 import { createWorld, PLOT_POSITIONS, WORLD_LIMIT } from './world.js';
-import { Plot, START_CASH, BELT_SPEED } from './tycoon.js';
+import { Plot, START_CASH, BELT_SPEED, validItems } from './tycoon.js';
 import { createAvatar, disposeAvatar } from './character.js';
 import { Particles, Effects } from './particles.js';
+import { Powers, Crystals } from './powers.js';
 import { makeLabel } from './textures.js';
 import { Input } from './input.js';
 import { sfx } from './audio.js';
@@ -58,12 +59,14 @@ addEventListener('resize', () => {
 });
 
 // ---------------------------------------------------------------------
-// Dunia & plot
+// Dunia, plot, kekuatan
 // ---------------------------------------------------------------------
 const world = createWorld(scene, renderer, quality);
 const particles = new Particles(scene);
 const effects = new Effects(scene);
 const plots = PLOT_POSITIONS.map((p, i) => new Plot(scene, i, p, particles));
+const powers = new Powers(scene, particles, effects);
+const crystals = new Crystals(scene, particles, world.isFree, ELEMENTS.map((e) => e.color));
 const input = new Input(canvas);
 
 // ---------------------------------------------------------------------
@@ -79,24 +82,30 @@ const game = {
   plot: null,
   plotIndex: -1,
   abilityCd: 0,
+  atkCd: 0,
+  ultCd: 0,
+  ultUntil: 0,
   abCount: 0,
+  pq: 0,
+  pd: null,
   boosts: {},
   nextOre: { count: 0, mult: 1 },
   income: 0,
   lastPad: null,
-  onCollect: false,
   shake: 0,
+  hitCd: 0,
 };
 let mp = offline('');
 const player = {
   pos: new THREE.Vector3(), vel: new THREE.Vector3(), dash: new THREE.Vector3(),
   onGround: true, facing: 0, avatar: null, label: null, speed: 0,
 };
-let camYaw = 0, camPitch = 0.42, camDist = 13;
+let camYaw = 0, camPitch = 0.42, camDist = 13, camDistCur = 13;
 const camTarget = new THREE.Vector3(0, 3, 0);
 const camLook = new THREE.Vector3(0, 3, 0);
 const remotes = new Map();
 
+const ultActive = () => game.t < game.ultUntil;
 const boost = (k) => { const b = game.boosts[k]; return b && game.t < b.until ? b.mult : 1; };
 const rebirthMult = () => 1 + game.rebirths * 0.5;
 const priceMult = () => passive(game.element, 'discount');
@@ -104,9 +113,10 @@ const priceOf = (it) => Math.round(it.price * priceMult());
 
 function localMods() {
   const el = game.element;
+  const u = ultActive() ? 1.5 : 1;
   return {
-    drop: passive(el, 'drop') * boost('drop'),
-    value: passive(el, 'value') * boost('value') * rebirthMult(),
+    drop: passive(el, 'drop') * boost('drop') * u,
+    value: passive(el, 'value') * boost('value') * rebirthMult() * u,
     upg: passive(el, 'upg') * boost('upg'),
     nextOre: game.nextOre,
   };
@@ -173,14 +183,16 @@ function selectElement(el, card) {
   d.innerHTML = `
     <div class="d-head"><span class="d-icon">${el.icon}</span><div><h3>${el.name}</h3><p>${el.desc}</p></div></div>
     <div class="d-row"><b>Pasif</b><span>${el.passiveText}</span></div>
-    <div class="d-row"><b>Skill [E]</b><span><i>${el.ability.name}</i> — ${el.ability.text} (cooldown ${el.ability.cooldown}d)</span></div>`;
+    <div class="d-row"><b>[Q] Serang</b><span><i>${el.attack.name}</i></span></div>
+    <div class="d-row"><b>[E] Skill</b><span><i>${el.ability.name}</i> — ${el.ability.text}</span></div>
+    <div class="d-row"><b>[F] Ultimate</b><span><i>${el.ult.name}</i> — terbang + semua bonus x1.5</span></div>`;
   $('playBtn').disabled = false;
   $('playBtn').style.setProperty('--c', hex(el.color));
   if (preview) disposeAvatar(preview);
   preview = createAvatar(el);
   preview.root.position.copy(PREVIEW_POS);
   scene.add(preview.root);
-  particles.emit(PREVIEW_POS.clone().setY(1.5), 90, { ...el.fx, speed: (el.fx.speed || 2) * 2 + 2, spread: 0.5 });
+  particles.emit(PREVIEW_POS.clone().setY(1.5), 60, { ...el.fx, speed: (el.fx.speed || 2) * 2 + 2, spread: 0.5 });
   effects.shockwave(PREVIEW_POS, el.color, 5);
 }
 
@@ -266,7 +278,7 @@ const handlers = {
       av.root.add(label.sprite);
       av.root.position.set(d.x, d.y, d.z);
       scene.add(av.root);
-      r = { id, avatar: av, label, el, target: new THREE.Vector3(d.x, d.y, d.z), ry: d.r || 0, s: 0, g: false, ab: d.ab, n: d.n, c: d.c || 0 };
+      r = { id, avatar: av, label, el, target: new THREE.Vector3(d.x, d.y, d.z), ry: d.r || 0, s: 0, g: false, ab: d.ab, pq: d.pq, n: d.n, c: d.c || 0, u: 0 };
       remotes.set(id, r);
       if (game.state === 'playing') toast(`👋 ${d.n || 'Pemain'} (${el.name}) bergabung`, hex(el.glow));
     }
@@ -274,6 +286,14 @@ const handlers = {
     r.ry = d.r || 0; r.s = d.s || 0; r.g = !!d.g; r.c = d.c || 0;
     if (d.n !== r.n) { r.n = d.n; r.label.set([{ text: d.n || 'Pemain', color: hex(el.glow), size: 42 }]); }
     if (d.ab !== r.ab) { r.ab = d.ab; abilityFx(r.avatar.root.position, el); }
+    if (!!d.u !== !!r.u) { r.u = d.u; r.avatar.setPower(!!d.u); if (d.u) ultFx(r.avatar.root.position, el); }
+    if (d.pq !== r.pq) {
+      r.pq = d.pq;
+      if (Array.isArray(d.pd) && d.pd.length === 6) {
+        r.avatar.punch();
+        powers.fire({ local: false, el, name: r.n || 'Pemain', id }, new THREE.Vector3(d.pd[0], d.pd[1], d.pd[2]), new THREE.Vector3(d.pd[3], d.pd[4], d.pd[5]).normalize(), powerWorld);
+      }
+    }
     updateLeaderboard();
   },
   onPlayerLeave(id) {
@@ -291,7 +311,7 @@ const handlers = {
   },
   onChat(m) {
     if (!m) return;
-    const r = [...remotes.values()].find((x) => x.id === m.uid);
+    const r = remotes.get(m.uid);
     addChat(m.n || '?', m.m || '', m.uid === mp.id ? hex(game.element?.glow || 0xffffff) : r ? hex(r.el.glow) : '#9ecbff');
   },
   onConnection(ok) {
@@ -336,7 +356,7 @@ async function startGame(el) {
   const s = loadSave(el.id);
   game.cash = s ? s.cash : START_CASH;
   game.rebirths = s ? s.rebirths || 0 : 0;
-  const items = s ? s.items || [] : [];
+  const items = validItems(s ? s.items : []);
 
   let idx = await mp.claimPlot(plots.length, { name: game.name, element: el.id, items: Object.fromEntries(items.map((i) => [i, true])) });
   if (idx < 0) {
@@ -352,7 +372,6 @@ async function startGame(el) {
   items.forEach((id) => plot.build(id, false));
   game.plot = plot;
 
-  // avatar pemain
   player.avatar = createAvatar(el);
   player.label = makeLabel([{ text: game.name, color: hex(el.glow), size: 42 }], { scale: 0.9 });
   player.label.sprite.position.y = 3.3;
@@ -364,9 +383,10 @@ async function startGame(el) {
   $('elName').textContent = el.name;
   $('elPassive').textContent = el.passiveText;
   $('elBadge').style.setProperty('--c', hex(el.color));
-  $('abilityBtn').style.setProperty('--c', hex(el.color));
-  $('abIcon').textContent = el.icon;
-  $('abName').textContent = el.ability.name;
+  for (const id of ['btnAttack', 'abilityBtn', 'btnUlt']) $(id).style.setProperty('--c', hex(el.color));
+  $('atkIcon').textContent = el.icon; $('atkName').textContent = el.attack.name;
+  $('abIcon').textContent = el.icon; $('abName').textContent = el.ability.name;
+  $('ultIcon').textContent = '👑'; $('ultName').textContent = el.ult.name;
   $('netStatus').textContent = mp.online ? `🟢 Online · room ${mp.room}` : '⚪ Offline';
   $('netStatus').title = mp.online ? '' : mp.reason;
   $('chatBtn').classList.toggle('hidden', !mp.online);
@@ -376,6 +396,7 @@ async function startGame(el) {
   updateLeaderboard();
   toast(`Selamat datang di markas ${el.name}, ${game.name}! ${el.icon}`, hex(el.glow));
   if (!items.length) setTimeout(() => toast('Injak tombol hijau "Dropper I" untuk mulai!', '#7dff9b'), 1500);
+  setTimeout(() => toast('💎 Hancurkan Kristal Elemen di padang rumput dengan [Q]!', '#b3e5fc'), 6000);
   abilityFx(player.pos, el);
 }
 
@@ -400,11 +421,12 @@ function buy(it) {
     game.cash = START_CASH;
     game.plot.reset();
     game.nextOre = { count: 0, mult: 1 };
+    respawn();
     toast(`♻ REBIRTH #${game.rebirths}! Bonus pendapatan permanen x${rebirthMult().toFixed(1)}`, '#ffd54f');
     for (let i = 0; i < 6; i++) setTimeout(() => particles.emit(player.pos.clone().setY(3), 80, { color: 0xffd54f, color2: 0xff4081, speed: 9, life: 1.6, gravity: 6, size: 0.4 }), i * 150);
   } else {
     game.plot.build(it.id, true);
-    toast(`✅ ${it.name} dibangun!`, '#7dff9b');
+    toast(it.type === 'floor' ? `🏢 ${it.name} dibangun! Naik tangga di samping ↗` : `✅ ${it.name} dibangun!`, '#7dff9b');
   }
   sfx.buy();
   syncPlot();
@@ -425,12 +447,50 @@ function collectBank() {
 }
 
 // ---------------------------------------------------------------------
-// Skill elemen
+// KEKUATAN: [Q] serang · [E] skill · [F] ultimate
 // ---------------------------------------------------------------------
 function abilityFx(pos, el) {
   const fx = el.fx;
   particles.emit(new THREE.Vector3(pos.x, pos.y + 1.4, pos.z), 140, { ...fx, speed: (fx.speed || 2) * 2.5 + 3, spread: 0.6, life: (fx.life || 1) * 1.3, size: (fx.size || 0.4) * 1.3 });
   effects.shockwave(pos, el.color, 9);
+}
+function ultFx(pos, el) {
+  for (let i = 0; i < 3; i++) setTimeout(() => effects.shockwave(pos, i === 1 ? el.glow : el.color, 10 + i * 6), i * 120);
+  particles.emit(new THREE.Vector3(pos.x, pos.y + 1.5, pos.z), 260, { ...el.fx, speed: (el.fx.speed || 2) * 3 + 6, spread: 0.8, life: 1.6, size: (el.fx.size || 0.4) * 1.5 });
+  effects.bolt(new THREE.Vector3(pos.x, pos.y + 40, pos.z), new THREE.Vector3(pos.x, pos.y + 1, pos.z), el.glow);
+}
+
+const aim = new THREE.Vector3();
+function attack() {
+  if (game.state !== 'playing' || game.atkCd > 0) return;
+  const el = game.element, a = el.attack;
+  game.atkCd = a.cooldown * (ultActive() ? 0.35 : 1);
+  camera.getWorldDirection(aim);
+  aim.y = clamp(aim.y + 0.15, -0.4, 0.5);
+  aim.normalize();
+  player.facing = Math.atan2(aim.x, aim.z);
+  const sc = ultActive() ? 1.25 : 1;
+  const origin = player.pos.clone().add(new THREE.Vector3(0, 1.7 * sc, 0)).addScaledVector(aim, 0.9);
+  powers.fire({ local: true, el, name: game.name, id: mp.id }, origin, aim.clone(), powerWorld);
+  player.avatar.punch();
+  game.pq++;
+  game.pd = [origin.x, origin.y, origin.z, aim.x, aim.y, aim.z].map((n) => +n.toFixed(2));
+  sfx.attack(el.id);
+  sendState(true);
+}
+
+function ultimate() {
+  if (game.state !== 'playing' || game.ultCd > 0) return;
+  const el = game.element;
+  game.ultCd = el.ult.cooldown;
+  game.ultUntil = game.t + el.ult.duration;
+  game.atkCd = 0;
+  ultFx(player.pos, el);
+  game.shake = 0.5;
+  player.vel.y = 10; player.onGround = false;
+  sfx.ult();
+  toast(`👑 ${el.ult.name}! Tahan Spasi untuk terbang`, hex(el.glow));
+  sendState(true);
 }
 
 function useAbility() {
@@ -453,12 +513,11 @@ function useAbility() {
       break;
     }
     case 'zap': {
-      const target = plot.toWorld(new THREE.Vector3(12, 1.9, -8), new THREE.Vector3());
       let n = 0;
-      const before = plot.bank;
-      plot.collectAll(localMods(), (o) => { if (n++ < 40) effects.bolt(plot.oreWorld(o, new THREE.Vector3()), target, el.glow); });
-      game.income += (plot.bank - before) * 0.05;
-      for (let i = 0; i < 3; i++) effects.bolt(player.pos.clone().setY(30), player.pos.clone().setY(1), 0xfff59d);
+      plot.collectAll(localMods(), (o) => {
+        if (n++ < 40) effects.bolt(plot.oreWorld(o, new THREE.Vector3()), plot.collectPoint(o.c, new THREE.Vector3()), el.glow);
+      });
+      for (let i = 0; i < 3; i++) effects.bolt(player.pos.clone().setY(player.pos.y + 30), player.pos.clone().setY(player.pos.y + 1), 0xfff59d);
       player.dash.set(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(32);
       if (n) toast(`⚡ ${n} ore tersambar!`, '#fff27a');
       break;
@@ -484,6 +543,61 @@ function useAbility() {
   sendState(true);
 }
 
+// Dunia untuk sistem proyektil
+const playerCenter = new THREE.Vector3();
+const shielded = () => game.plot && game.plot.contains(player.pos);
+const powerWorld = {
+  solidAt(p) {
+    if (p.y <= 0.02) return true;
+    for (const plot of plots) {
+      if (Math.abs(p.x - plot.center.x) > 22 || Math.abs(p.z - plot.center.z) > 22) continue;
+      plot.toLocal(p, tmpL);
+      for (const c of plot.colliders) {
+        if (tmpL.x > c.x0 && tmpL.x < c.x1 && tmpL.z > c.z0 && tmpL.z < c.z1 && tmpL.y > c.y0 && tmpL.y < c.y1) return true;
+      }
+    }
+    return false;
+  },
+  targets(owner) {
+    const t = [];
+    if (owner.local) {
+      for (const cr of crystals.items) t.push({ pos: cr.pos, r: 1.0, hit: () => crystals.break(cr) });
+      for (const r of remotes.values()) t.push({ pos: r.center || (r.center = new THREE.Vector3()), r: 0.9, hit: () => {} });
+    } else if (game.state === 'playing') {
+      playerCenter.copy(player.pos).y += 1.3;
+      t.push({ pos: playerCenter, r: 0.9, hit: (dir, a) => getHit(dir, owner, a) });
+      for (const r of remotes.values()) if (r.id !== owner.id) t.push({ pos: r.center || (r.center = new THREE.Vector3()), r: 0.9, hit: () => {} });
+    }
+    return t;
+  },
+  onExplode(pos, a) {
+    if (game.state === 'playing' && a.quake && pos.distanceTo(player.pos) < 20) game.shake = Math.max(game.shake, 0.45);
+  },
+};
+
+function getHit(dir, owner, a) {
+  if (game.hitCd > 0) return;
+  game.hitCd = 0.4;
+  if (shielded()) {
+    effects.shockwave(player.pos, 0x80d8ff, 3);
+    return;
+  }
+  player.dash.set(dir.x * 20, 0, dir.z * 20);
+  player.vel.y = 7;
+  player.onGround = false;
+  game.shake = Math.max(game.shake, 0.5);
+  sfx.hit();
+  toast(`💥 Kena ${a.name} dari ${owner.name}!`, hex(owner.el.glow));
+}
+
+crystals.onBreak = (cr) => {
+  if (game.state !== 'playing') return;
+  const amt = Math.max(50, game.income * 6 + 25) * rebirthMult();
+  game.cash += amt;
+  sfx.coin();
+  toast(`💎 Kristal Elemen! +${fmt(amt)}`, '#b3e5fc');
+};
+
 // ---------------------------------------------------------------------
 // Fisika pemain & tabrakan (AABB lokal per plot)
 // ---------------------------------------------------------------------
@@ -492,17 +606,20 @@ const fwd = new THREE.Vector3(), right = new THREE.Vector3(), wish = new THREE.V
 const R = 0.45, STEP = 0.55, HEIGHT = 2.6;
 
 function collide(pos) {
-  let ground = 0, belt = null;
+  let ground = 0, ceil = Infinity, belt = null;
   for (const plot of plots) {
     if (Math.abs(pos.x - plot.center.x) > 24 || Math.abs(pos.z - plot.center.z) > 24) continue;
     plot.toLocal(pos, tmpL);
     for (const c of plot.colliders) {
       if (tmpL.x < c.x0 - R || tmpL.x > c.x1 + R || tmpL.z < c.z0 - R || tmpL.z > c.z1 + R) continue;
-      if (tmpL.y + HEIGHT < c.y0) continue;
+      if (tmpL.y + HEIGHT <= c.y0) continue;
+      const inside = tmpL.x > c.x0 - 0.15 && tmpL.x < c.x1 + 0.15 && tmpL.z > c.z0 - 0.15 && tmpL.z < c.z1 + 0.15;
       if (c.y1 <= tmpL.y + STEP) {
-        // bisa diinjak — hanya jika benar-benar di atasnya (tanpa radius)
-        const inside = tmpL.x > c.x0 - 0.15 && tmpL.x < c.x1 + 0.15 && tmpL.z > c.z0 - 0.15 && tmpL.z < c.z1 + 0.15;
         if (inside && c.y1 > ground) { ground = c.y1; belt = c.belt ? plot : null; }
+        continue;
+      }
+      if (c.slab && tmpL.y < c.y0) { // plafon
+        if (inside) ceil = Math.min(ceil, c.y0);
         continue;
       }
       const p0 = tmpL.x - (c.x0 - R), p1 = c.x1 + R - tmpL.x, q0 = tmpL.z - (c.z0 - R), q1 = c.z1 + R - tmpL.z;
@@ -511,23 +628,24 @@ function collide(pos) {
     }
     plot.toWorld(tmpL, pos);
   }
-  return { ground, belt };
+  return { ground, ceil, belt };
 }
 
 function updatePlayer(dt) {
   const el = game.element;
   camYaw -= input.lookX * 0.005;
   camPitch = clamp(camPitch + input.lookY * 0.004, -0.15, 1.3);
-  camDist = clamp(camDist + input.zoom * 1.3, 5, 30);
+  camDist = clamp(camDist + input.zoom * 1.3, 4, 30);
 
+  const ult = ultActive();
   const mv = input.moveVector();
   const sprint = input.down('ShiftLeft', 'ShiftRight');
-  const spMult = passive(el, 'speed') * boost('speed');
+  const spMult = passive(el, 'speed') * boost('speed') * (ult ? 1.3 : 1);
   const maxSpeed = (sprint ? 11.5 : 7.5) * spMult;
   fwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
   right.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
   wish.set(0, 0, 0).addScaledVector(fwd, mv.y).addScaledVector(right, mv.x);
-  const acc = player.onGround ? 14 : 4;
+  const acc = player.onGround ? 14 : (ult ? 10 : 4);
   player.vel.x = damp(player.vel.x, wish.x * maxSpeed, acc, dt);
   player.vel.z = damp(player.vel.z, wish.z * maxSpeed, acc, dt);
   if (wish.lengthSq() > 0.01) player.facing = lerpAngle(player.facing, Math.atan2(wish.x, wish.z), 1 - Math.exp(-12 * dt));
@@ -538,9 +656,16 @@ function updatePlayer(dt) {
     sfx.jump();
   }
   if (input.hit('KeyE')) useAbility();
+  if (input.hit('KeyQ') || input.hit('Click')) attack();
+  if (input.hit('KeyF')) ultimate();
   if (input.hit('KeyR')) respawn();
 
-  player.vel.y -= 26 * dt;
+  // terbang saat ultimate
+  const flying = ult && input.down('Space') && !player.onGround;
+  if (flying) player.vel.y = damp(player.vel.y, 9, 5, dt);
+  else player.vel.y -= (ult ? 12 : 26) * dt;
+  if (ult && player.vel.y < -6) player.vel.y = -6; // melayang turun
+
   player.pos.x += (player.vel.x + player.dash.x) * dt;
   player.pos.z += (player.vel.z + player.dash.z) * dt;
   player.dash.multiplyScalar(Math.exp(-5 * dt));
@@ -551,6 +676,7 @@ function updatePlayer(dt) {
     player.pos.addScaledVector(tmpD, BELT_SPEED * dt);
   }
   player.pos.y += player.vel.y * dt;
+  if (player.pos.y + HEIGHT > col.ceil) { player.pos.y = col.ceil - HEIGHT; if (player.vel.y > 0) player.vel.y = 0; }
   if (player.pos.y <= col.ground) {
     player.pos.y = col.ground;
     if (player.vel.y < 0) player.vel.y = 0;
@@ -560,6 +686,7 @@ function updatePlayer(dt) {
   }
   player.pos.x = clamp(player.pos.x, -WORLD_LIMIT, WORLD_LIMIT);
   player.pos.z = clamp(player.pos.z, -WORLD_LIMIT, WORLD_LIMIT);
+  player.pos.y = Math.min(player.pos.y, 60);
   if (player.pos.y < -30) respawn();
 
   const hs = Math.hypot(player.vel.x, player.vel.z);
@@ -567,13 +694,15 @@ function updatePlayer(dt) {
   const av = player.avatar;
   av.root.position.copy(player.pos);
   av.root.rotation.y = player.facing;
+  av.setPower(ult);
   av.update(dt, player.speed, !player.onGround);
 
   // aura elemen
-  if (Math.random() < dt * 22) {
-    particles.emit(tmpW.set(player.pos.x, player.pos.y + 1.2 + Math.random(), player.pos.z), 1, { ...el.fx, spread: 0.6, speed: (el.fx.speed || 1) * 0.4, size: (el.fx.size || 0.4) * 0.7 });
+  if (Math.random() < dt * (ult ? 70 : 22)) {
+    particles.emit(tmpW.set(player.pos.x, player.pos.y + 1.2 + Math.random(), player.pos.z), ult ? 2 : 1, { ...el.fx, spread: ult ? 1 : 0.6, speed: (el.fx.speed || 1) * (ult ? 1 : 0.4), size: (el.fx.size || 0.4) * (ult ? 1.1 : 0.7) });
   }
-  if (boost('speed') > 1 && hs > 1) particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.5, player.pos.z), 2, { ...el.fx, swirl: 8, speed: 2 });
+  if ((boost('speed') > 1 || ult) && hs > 1) particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.5, player.pos.z), 2, { ...el.fx, swirl: 8, speed: 2 });
+  if (!player.onGround) for (const j of av.jets()) { j.getWorldPosition(tmpW); particles.emit(tmpW, 2, { color: 0x00e5ff, color2: 0xffffff, speed: 1, dir: new THREE.Vector3(0, -6, 0), life: 0.35, size: 0.35 }); }
 
   // pad beli & pad uang
   const plot = game.plot;
@@ -588,6 +717,19 @@ function updatePlayer(dt) {
   if (plot.has('autocollect') && plot.bank >= 1) { game.cash += plot.bank; plot.bank = 0; }
 }
 
+// Kamera tidak menembus lantai/plafon
+const ray = new THREE.Raycaster();
+const camDir = new THREE.Vector3();
+function cameraClearance(target, dir, dist) {
+  const occ = [];
+  for (const p of plots) if (p.occluders.length && Math.abs(target.x - p.center.x) < 40 && Math.abs(target.z - p.center.z) < 40) occ.push(...p.occluders);
+  if (!occ.length) return dist;
+  ray.set(target, dir);
+  ray.far = dist;
+  const hit = ray.intersectObjects(occ, false)[0];
+  return hit ? Math.max(1.5, hit.distance - 0.4) : dist;
+}
+
 function updateCamera(dt) {
   if (game.state === 'playing') {
     tmpW.copy(player.pos).y += 2.2;
@@ -595,11 +737,10 @@ function updateCamera(dt) {
     camTarget.z = damp(camTarget.z, tmpW.z, 18, dt);
     camTarget.y = damp(camTarget.y, tmpW.y, 10, dt);
     const cp = Math.cos(camPitch);
-    camera.position.set(
-      camTarget.x + Math.sin(camYaw) * cp * camDist,
-      camTarget.y + Math.sin(camPitch) * camDist,
-      camTarget.z + Math.cos(camYaw) * cp * camDist,
-    );
+    camDir.set(Math.sin(camYaw) * cp, Math.sin(camPitch), Math.cos(camYaw) * cp);
+    const want = cameraClearance(camTarget, camDir, camDist);
+    camDistCur = want < camDistCur ? want : damp(camDistCur, want, 4, dt);
+    camera.position.copy(camTarget).addScaledVector(camDir, camDistCur);
     if (camera.position.y < 0.4) camera.position.y = 0.4;
     camLook.copy(camTarget);
   } else {
@@ -611,7 +752,7 @@ function updateCamera(dt) {
       preview.root.rotation.y += dt * 0.6;
       preview.update(dt, 0, false);
       const fx = preview.element.fx;
-      if (Math.random() < dt * 30) particles.emit(tmpW.set(PREVIEW_POS.x, 1.3 + Math.random(), PREVIEW_POS.z), 1, { ...fx, spread: 0.7, speed: (fx.speed || 1) * 0.5 });
+      if (Math.random() < dt * 20) particles.emit(tmpW.set(PREVIEW_POS.x, 1.3 + Math.random(), PREVIEW_POS.z), 1, { ...fx, spread: 0.7, speed: (fx.speed || 1) * 0.5 });
     } else {
       const a = game.t * 0.05;
       pos = new THREE.Vector3(Math.sin(a) * 52, 24, Math.cos(a) * 52);
@@ -641,32 +782,40 @@ function updateRemotes(dt) {
     if (root.position.distanceToSquared(r.target) > 400) root.position.copy(r.target);
     root.rotation.y = lerpAngle(root.rotation.y, r.ry, 1 - Math.exp(-12 * dt));
     r.avatar.update(dt, r.s, r.g);
-    if (Math.random() < dt * 10) particles.emit(tmpW.set(root.position.x, root.position.y + 1.2 + Math.random(), root.position.z), 1, { ...r.el.fx, spread: 0.6, speed: (r.el.fx.speed || 1) * 0.4, size: (r.el.fx.size || 0.4) * 0.7 });
+    (r.center || (r.center = new THREE.Vector3())).copy(root.position).y += 1.3;
+    if (Math.random() < dt * (r.u ? 40 : 10)) particles.emit(tmpW.set(root.position.x, root.position.y + 1.2 + Math.random(), root.position.z), 1, { ...r.el.fx, spread: 0.6, speed: (r.el.fx.speed || 1) * 0.4, size: (r.el.fx.size || 0.4) * 0.7 });
   }
 }
 
 function sendState(force = false) {
   if (!mp.online || game.state !== 'playing') return;
   const p = player.pos;
-  mp.sendState({
+  const st = {
     n: game.name, e: game.element.id,
     x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2),
     r: +player.facing.toFixed(2), s: +player.speed.toFixed(2), g: !player.onGround,
-    ab: game.abCount, c: Math.floor(game.cash),
-  }, force);
+    ab: game.abCount, c: Math.floor(game.cash), u: ultActive() ? 1 : 0, pq: game.pq,
+  };
+  if (game.pd) st.pd = game.pd;
+  mp.sendState(st, force);
 }
 
 // ---------------------------------------------------------------------
 // HUD
 // ---------------------------------------------------------------------
 let hudTimer = 0, lbTimer = 0;
+function cdButton(id, cdId, cd, max) {
+  $(id).style.setProperty('--p', cd > 0 ? cd / max : 0);
+  $(cdId).textContent = cd > 0.05 ? (cd < 1 ? cd.toFixed(1) : Math.ceil(cd)) : '';
+  $(id).classList.toggle('ready', cd <= 0);
+}
 function updateHud(dt) {
   hudTimer -= dt;
   const el = game.element;
-  const cd = game.abilityCd;
-  $('abilityBtn').style.setProperty('--p', cd > 0 ? (cd / el.ability.cooldown) : 0);
-  $('abCd').textContent = cd > 0 ? Math.ceil(cd) : '';
-  $('abilityBtn').classList.toggle('ready', cd <= 0);
+  cdButton('abilityBtn', 'abCd', game.abilityCd, el.ability.cooldown);
+  cdButton('btnAttack', 'atkCd', game.atkCd, el.attack.cooldown);
+  cdButton('btnUlt', 'ultCd', game.ultCd, el.ult.cooldown);
+  $('btnUlt').classList.toggle('active', ultActive());
   if (hudTimer > 0) return;
   hudTimer = 0.1;
   $('cash').textContent = fmt(game.cash);
@@ -674,11 +823,13 @@ function updateHud(dt) {
   $('rebirth').textContent = game.rebirths ? `♻ Rebirth ${game.rebirths} · x${rebirthMult().toFixed(1)}` : '';
   const labels = { drop: '⚙ Dropper', value: '💎 Nilai', upg: '🔧 Upgrader', speed: '💨 Kecepatan' };
   const bs = [];
+  if (ultActive()) bs.push(`<span class="ult">👑 ${el.ult.name} · ${Math.ceil(game.ultUntil - game.t)}d</span>`);
   for (const k of Object.keys(labels)) {
     const b = game.boosts[k];
     if (b && game.t < b.until) bs.push(`<span>${labels[k]} x${b.mult} · ${Math.ceil(b.until - game.t)}d</span>`);
   }
   if (game.nextOre.count > 0) bs.push(`<span>✨ Ore spesial x${game.nextOre.mult} · ${game.nextOre.count} lagi</span>`);
+  if (shielded()) bs.push('<span class="safe">🛡 Zona aman markas</span>');
   $('boosts').innerHTML = bs.join('');
   lbTimer -= 0.1;
   if (lbTimer <= 0) { lbTimer = 1; updateLeaderboard(); }
@@ -696,6 +847,9 @@ function loop() {
   if (game.state === 'playing') {
     updatePlayer(dt);
     game.abilityCd = Math.max(0, game.abilityCd - dt);
+    game.atkCd = Math.max(0, game.atkCd - dt);
+    game.ultCd = Math.max(0, game.ultCd - dt);
+    game.hitCd = Math.max(0, game.hitCd - dt);
   }
   const mods = game.state === 'playing' ? localMods() : null;
   for (const p of plots) {
@@ -708,6 +862,8 @@ function loop() {
     }
   }
   updateRemotes(dt);
+  powers.update(dt, powerWorld);
+  crystals.update(dt, game.state === 'playing' ? player.pos : null);
   updateCamera(dt);
   world.update(dt, game.t, game.state === 'playing' ? player.pos : camLook);
   particles.update(dt);
@@ -724,3 +880,4 @@ loop();
 window.game = game;
 game.player = player;
 game._handlers = handlers; // untuk debug/tes multiplayer
+game._scene = scene;
