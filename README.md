@@ -13,6 +13,8 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 - **Animasi**: pose serangan berbeda (lempar, tebas, rapal, pukul, hantam), efek skill unik tiap elemen, perubahan wujud Ultimate + benda mengorbit, terbang gaya superhero, 5 emote (👋 Lambai, 💃 Joget, 🫡 Hormat, 💪 Pamer, 🏆 Menang)
 - **Alam lebih realistis**: pohon oak, pinus & birch yang bergoyang tertiup angin, semak, batu, dan pegunungan bersalju di sekeliling peta
 - **Siklus Pagi – Siang – Senja – Malam** (1 hari = 12 menit: siang 8 menit, malam 4 menit), sama untuk semua pemain. Malam: bintang berkelip, bulan, kunang-kunang, lampu jalan & lampu markas menyala
+- **Hutan lebat** (oak, pinus, birch) dengan padang terbuka di sela-selanya, kayu tumbang, jamur & semak
+- **Sungai mengalir** dari ngarai pegunungan, berkelok di padang, masuk ke danau lalu keluar lagi — lengkap dengan tepian pasir, batu, batu pijakan & alang-alang
 - **Suasana hidup**: awan berarak, kawanan burung, danau beriak dengan dermaga & alang-alang, rumput bergoyang, warga NPC di plaza yang jalan-jalan, melambai, joget & duduk
 - **Animasi karakter ber-rig** (siku, lutut, pergelangan kaki): langkah jalan/lari sinkron, condong saat belok, mendarat, gerakan iseng saat diam, gaya jalan per kostum (ninja, berat, robot, penyihir...)
 - **Kristal Elemen** muncul di padang rumput — hancurkan dengan serangan [Q] untuk bonus uang
@@ -133,6 +135,8 @@ src/
   nature.js           pohon realistis, angin, semak, batu, pegunungan
   daynight.js         siklus pagi-siang-senja-malam, bintang, bulan
   ambient.js          awan, burung, kunang-kunang, danau, rumput, lampu jalan
+  riverpath.js        jalur sungai & danau (dipakai untuk pohon, rumput, ngarai)
+  river.js            air sungai mengalir, tepian, batu, alang-alang
   animator.js         animasi prosedural ber-rig (dari contoh proyek) + aksi tambahan
   npcs.js             warga plaza
   tycoon.js           plot bertingkat, item, dropper/conveyor/upgrader/collector, pad beli

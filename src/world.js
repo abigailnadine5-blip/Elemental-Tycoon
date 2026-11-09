@@ -5,6 +5,8 @@ import { ELEMENTS } from './elements.js';
 import { createNature } from './nature.js';
 import { createDayNight } from './daynight.js';
 import { createAmbient, LAKE } from './ambient.js';
+import { createRiver } from './river.js';
+import { distToRiver, riverWidth } from './riverpath.js';
 
 export const PLOT_POSITIONS = [
   new THREE.Vector3(0, 0, -58),
@@ -92,12 +94,14 @@ export function createWorld(scene, renderer, quality) {
   const isFree = (x, z) => {
     if (Math.hypot(x, z) < 22) return false;
     if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 7) return false;
+    if (distToRiver(x, z, 14) < riverWidth(x, z) * 0.5 + 4) return false;
     if (Math.abs(x) < 6 || Math.abs(z) < 6) { if (Math.hypot(x, z) < 90) return false; }
     for (const p of PLOT_POSITIONS) if (Math.abs(x - p.x) < 27 && Math.abs(z - p.z) < 27) return false;
     return true;
   };
   const nature = createNature(scene, quality, isFree);
   const ambient = createAmbient(scene, quality, isFree);
+  const river = createRiver(scene, quality);
 
   // ---------- Update ----------
   const tmpCol = new THREE.Color();
@@ -105,6 +109,7 @@ export function createWorld(scene, renderer, quality) {
     nature.update(dt, t);
     dn.update(dt, t, focus, camPos);
     ambient.update(dt, t, dn.state, camPos);
+    river.update(dt, t, dn.state);
     const night = dn.state.night;
     crystalMat.emissiveIntensity = 1.2 + night * 1.5;
     for (const o of obelisks) o.material.emissiveIntensity = 1.6 + night * 2.2;

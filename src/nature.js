@@ -5,6 +5,7 @@
 //  - pegunungan asli: tanah naik membentuk punggung gunung, lereng batu, puncak bersalju, pinus di kaki gunung
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { distToRiver } from './riverpath.js';
 
 // ---------- noise sederhana (value noise + fbm) ----------
 function hash(x, y, z) {
@@ -41,7 +42,10 @@ export function terrainHeight(x, z) {
   const base = fbm(x * 0.003, z * 0.003, 5);
   const detail = fbm(x * 0.02, z * 0.02, 3);
   const peaks = Math.pow(0.3 * base + 0.7 * ridge * ridge, 1.6);
-  return -2 + t * (12 + 120 * peaks) + t * detail * 9;
+  const h = -2 + t * (12 + 120 * peaks) + t * detail * 9;
+  // ngarai tempat sungai mengalir menembus pegunungan
+  const d = distToRiver(x, z, 50);
+  return d < 50 ? -2 + (h + 2) * smooth(4, 48, d) : h;
 }
 
 // ---------- tekstur kulit kayu ----------
@@ -222,18 +226,23 @@ export function createNature(scene, quality, isFree) {
   };
 
   // padang rumput
-  const total = quality.trees;
+  // HUTAN: pohon jauh lebih banyak, berkelompok membentuk hutan lebat dengan padang terbuka di sela-selanya
+  const total = Math.round(quality.trees * 3.6);
+  const forestSpots = [];
   let tries = 0;
-  while (types.oak.list.length + types.pine.list.length + types.birch.list.length < total && tries < total * 40) {
+  while (types.oak.list.length + types.pine.list.length + types.birch.list.length < total && tries < total * 30) {
     tries++;
-    const r = 28 + Math.sqrt(Math.random()) * 205, a = Math.random() * Math.PI * 2;
+    const r = 26 + Math.sqrt(Math.random()) * 215, a = Math.random() * Math.PI * 2;
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (!isFree(x, z)) continue;
-    // hutan berkelompok: pakai noise agar ada area padat & area terbuka
-    if (noise3(x * 0.03, 1, z * 0.03) < 0.42) continue;
+    const dens = noise3(x * 0.022, 1, z * 0.022) + (r > 120 ? 0.12 : 0);
+    if (dens < 0.36) continue;
+    if (dens < 0.5 && Math.random() > 0.18) continue;
+    const deep = dens > 0.62;
     const pick = Math.random();
-    const kind = r > 150 && pick < 0.55 ? 'pine' : pick < 0.5 ? 'oak' : pick < 0.82 ? 'pine' : 'birch';
-    types[kind].list.push([x, 0, z, 0.75 + Math.random() * 0.6]);
+    const kind = deep ? (pick < 0.62 ? 'pine' : pick < 0.9 ? 'oak' : 'birch') : (pick < 0.45 ? 'oak' : pick < 0.75 ? 'pine' : 'birch');
+    types[kind].list.push([x, 0, z, (deep ? 0.95 : 0.75) + Math.random() * 0.65]);
+    if (deep && Math.random() < 0.25) forestSpots.push([x, z]);
   }
   // pinus di kaki & lereng gunung (tanpa bayangan agar ringan)
   const farPines = [];
@@ -246,7 +255,7 @@ export function createNature(scene, quality, isFree) {
   }
 
   // dikelompokkan per area (chunk) supaya pohon di luar layar/bayangan tidak ikut dirender
-  const CHUNK = 110;
+  const CHUNK = 64;
   const instanced = (geo, mat, items, shadow, tint) => {
     const cells = new Map();
     for (const it of items) {
@@ -273,17 +282,46 @@ export function createNature(scene, quality, isFree) {
     0.8 + Math.random() * 0.35, 0.85 + Math.random() * 0.3, 0.7 + Math.random() * 0.35]);
   for (const t of Object.values(types)) {
     const list = decorate(t.list);
-    instanced(t.trunk, t.tMat, list, true, false);
-    instanced(t.crown, t.cMat, list, true, true);
+    // pohon dekat pusat memberi bayangan; yang jauh tidak (lebih ringan)
+    const near = list.filter((it) => Math.hypot(it[0], it[2]) < 150), farL = list.filter((it) => Math.hypot(it[0], it[2]) >= 150);
+    instanced(t.trunk, t.tMat, near, true, false);
+    instanced(t.crown, t.cMat, near, true, true);
+    instanced(t.trunk, t.tMat, farL, false, false);
+    instanced(t.crown, t.cMat, farL, false, true);
   }
+
+  // lantai hutan: kayu tumbang & jamur
+  const logGeo = new THREE.CylinderGeometry(0.32, 0.38, 4.5, 8); logGeo.rotateZ(Math.PI / 2);
+  const logs = new THREE.InstancedMesh(logGeo, barkMat, Math.max(1, Math.floor(forestSpots.length * 0.35)));
+  let ln = 0;
+  for (const [x, z] of forestSpots) {
+    if (ln >= logs.count || Math.random() > 0.35) continue;
+    dummy.position.set(x + 2, 0.3, z + 1.5); dummy.rotation.set(0, Math.random() * Math.PI, 0); dummy.scale.setScalar(0.7 + Math.random() * 0.6); dummy.updateMatrix();
+    logs.setMatrixAt(ln++, dummy.matrix);
+  }
+  logs.count = ln; logs.castShadow = logs.receiveShadow = true;
+  scene.add(logs);
+  const capGeo = new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); capGeo.translate(0, 0.28, 0);
+  const stemGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.3, 6); stemGeo.translate(0, 0.15, 0);
+  const capCol = new THREE.Color(0xd32f2f), dotCol = new THREE.Color(0xfff3e0);
+  const shroom = mergeGeometries([colorize(capGeo.toNonIndexed(), (x, y, z, c) => c.copy(noise3(x * 25, y * 25, z * 25) > 0.72 ? dotCol : capCol)), colorize(stemGeo.toNonIndexed(), (x, y, z, c) => c.set(0xf3ead7))]);
+  const mushrooms = new THREE.InstancedMesh(shroom, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }), forestSpots.length * 3);
+  let mn = 0;
+  for (const [x, z] of forestSpots) for (let k = 0; k < 3; k++) {
+    dummy.position.set(x + (Math.random() - 0.5) * 3, 0, z + (Math.random() - 0.5) * 3); dummy.rotation.set(0, Math.random() * 6, 0); dummy.scale.setScalar(0.6 + Math.random() * 0.9); dummy.updateMatrix();
+    mushrooms.setMatrixAt(mn++, dummy.matrix);
+  }
+  mushrooms.count = mn;
+  scene.add(mushrooms);
   const far = decorate(farPines);
   instanced(types.pine.trunk, types.pine.tMat, far, false, false);
   instanced(types.pine.crown, types.pine.cMat, far, false, true);
 
   // semak
-  const bushes = new THREE.InstancedMesh(bushGeo(), leafMat, 260);
+  const BUSH = quality.trees > 300 ? 700 : 320;
+  const bushes = new THREE.InstancedMesh(bushGeo(), leafMat, BUSH);
   let bn = 0;
-  for (let i = 0; i < 2000 && bn < 260; i++) {
+  for (let i = 0; i < BUSH * 8 && bn < BUSH; i++) {
     const r = 20 + Math.random() * 210, a = Math.random() * Math.PI * 2;
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (!isFree(x, z)) continue;

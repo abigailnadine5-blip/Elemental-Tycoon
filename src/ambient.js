@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { noise3, addWind } from './nature.js';
 import { PLOT_POSITIONS } from './world.js';
 
-export const LAKE = { x: 104, z: 98, r: 21 };
+import { LAKE } from './riverpath.js';
+export { LAKE };
 
 function canvasTex(w, h, draw, srgb = true) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
