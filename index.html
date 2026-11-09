@@ -9,12 +9,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=3" />
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+        "./src/audio.js": "./src/audio.js?v=3",
+        "./src/character.js": "./src/character.js?v=3",
+        "./src/elements.js": "./src/elements.js?v=3",
+        "./src/input.js": "./src/input.js?v=3",
+        "./src/multiplayer.js": "./src/multiplayer.js?v=3",
+        "./src/particles.js": "./src/particles.js?v=3",
+        "./src/powers.js": "./src/powers.js?v=3",
+        "./src/textures.js": "./src/textures.js?v=3",
+        "./src/tycoon.js": "./src/tycoon.js?v=3",
+        "./src/util.js": "./src/util.js?v=3",
+        "./src/world.js": "./src/world.js?v=3",
+        "./firebase-config.js": "./firebase-config.js?v=3"
       }
     }
   </script>
@@ -43,6 +55,7 @@
           lalu injak <b style="color:#ffd54f">pad uang</b> untuk mengambil uangmu.</p>
       </div>
       <div id="netInfo" class="net-info"></div>
+      <div class="version">Versi 2.0 · 🏢 Lantai 2, 3 &amp; Rooftop · 👕 Baju Elemen · ⚡ Q / E / F</div>
     </div>
   </section>
 
@@ -100,6 +113,6 @@
   <div id="loading" class="loading"><div class="spinner"></div><p id="loadingText">Memuat dunia...</p></div>
   <noscript>Game ini butuh JavaScript.</noscript>
 
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/main.js?v=3"></script>
 </body>
 </html>

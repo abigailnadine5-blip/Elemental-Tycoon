@@ -137,6 +137,7 @@ src/
 - HP terasa berat? Tambahkan `?low` di URL. PC mau grafik penuh di layar sentuh? Pakai `?high`.
 - Ubah harga/nilai item di array `ITEMS` (`src/tycoon.js`).
 - Debug di console browser: `game.cash = 1e6`.
+- Setelah mengubah kode, naikkan angka `?v=` di `index.html` (import map, `style.css`, `main.js`) supaya browser pemain langsung memuat versi baru, bukan cache lama.
 
 ---
 

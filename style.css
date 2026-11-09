@@ -54,6 +54,7 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .how { text-align: left; font-size: 14px; color: #d6dbf0; background: rgba(0,0,0,.25); border-radius: 12px; padding: 4px 14px; }
 .how p { margin: 8px 0; }
 .net-info { font-size: 13px; color: var(--muted); }
+.version { font-size: 12px; font-weight: 900; color: #ffd54f; }
 
 /* ---------- pilih elemen ---------- */
 #select { align-items: stretch; }
