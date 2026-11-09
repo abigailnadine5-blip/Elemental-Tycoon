@@ -10,6 +10,7 @@ import { ELEMENTS, getElement, passive, hex } from './elements.js';
 import { createWorld, PLOT_POSITIONS, WORLD_LIMIT } from './world.js';
 import { Plot, START_CASH, BELT_SPEED, validItems, setNightLevel } from './tycoon.js';
 import { hourLabel } from './daynight.js';
+import { groundAt, WATER_Y } from './riverpath.js';
 import { createAvatar, disposeAvatar, COSTUMES, costumeName, EMOTES } from './character.js';
 import { ElementFX } from './elementfx.js';
 import { Villagers } from './npcs.js';
@@ -319,7 +320,7 @@ const handlers = {
       if (game.state === 'playing') toast(`👋 ${d.n || 'Pemain'} (${el.name}) bergabung`, hex(el.glow));
     }
     r.target.set(d.x, d.y, d.z);
-    r.ry = d.r || 0; r.s = d.s || 0; r.g = !!d.g; r.c = d.c || 0;
+    r.ry = d.r || 0; r.s = d.s || 0; r.g = !!d.g; r.c = d.c || 0; r.sw = !!d.sw;
     if (d.n !== r.n) { r.n = d.n; r.label.set([{ text: d.n || 'Pemain', color: hex(el.glow), size: 42 }]); }
     if (d.ab !== r.ab) { r.ab = d.ab; abilityFx(r.avatar.root.position, el); r.avatar.play('skill'); elFx.skill(el, r.avatar.root.position); }
     if (!!d.u !== !!r.u) { r.u = d.u; r.avatar.setPower(!!d.u); if (d.u) { ultFx(r.avatar.root.position, el); r.avatar.play('transform'); } }
@@ -445,7 +446,7 @@ function buildPlayerAvatar() {
   player.avatar.root.position.copy(player.pos);
   scene.add(player.avatar.root);
   player.avatar.anim.onStep = (side, run) => {
-    if (run > 0.3 && player.onGround) particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.1, player.pos.z), 3, { color: 0xb8a888, color2: 0xe0d6c0, speed: 1.2, up: 0.8, gravity: 3, life: 0.5, size: 0.35, additive: false });
+    if (run > 0.3 && player.onGround && !player.swimming) particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.1, player.pos.z), 3, { color: 0xb8a888, color2: 0xe0d6c0, speed: 1.2, up: 0.8, gravity: 3, life: 0.5, size: 0.35, additive: false });
   };
 }
 
@@ -730,20 +731,34 @@ function updatePlayer(dt) {
   const ult = ultActive();
   const mv = input.moveVector();
   const sprint = input.down('ShiftLeft', 'ShiftRight');
-  const spMult = passive(el, 'speed') * boost('speed') * (ult ? 1.3 : 1);
+  // ---- air: berenang / mengarungi ----
+  const bed = groundAt(player.pos.x, player.pos.z);
+  const holdFly = ult && input.down('Space') && !player.onGround && !player.swimming;
+  const swimming = bed < WATER_Y - 1.2 && player.pos.y < WATER_Y - 0.25 && !holdFly;
+  const wading = !swimming && bed < WATER_Y - 0.1 && player.pos.y < WATER_Y;
+  if (swimming && !player.swimming) {
+    sfx.splash();
+    particles.emit(tmpW.set(player.pos.x, WATER_Y + 0.2, player.pos.z), 50, { color: 0xb3e5fc, color2: 0xffffff, speed: 5, up: 5, gravity: 14, life: 0.9, size: 0.35 });
+    effects.shockwave(tmpW.set(player.pos.x, WATER_Y, player.pos.z), 0x80d8ff, 4);
+    if (!game.swimHint) { game.swimHint = true; toast('🏊 Berenang! Spasi = lompat keluar dari air', '#80d8ff'); }
+  }
+  player.swimming = swimming;
+  const spMult = passive(el, 'speed') * boost('speed') * (ult ? 1.3 : 1) * (swimming ? 0.55 : wading ? 0.75 : 1);
   const maxSpeed = (sprint ? 11.5 : 7.5) * spMult;
   fwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
   right.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
   wish.set(0, 0, 0).addScaledVector(fwd, mv.y).addScaledVector(right, mv.x);
-  const acc = player.onGround ? 14 : (ult ? 10 : 4);
+  const acc = swimming ? 5 : player.onGround ? 14 : (ult ? 10 : 4);
   player.vel.x = damp(player.vel.x, wish.x * maxSpeed, acc, dt);
   player.vel.z = damp(player.vel.z, wish.z * maxSpeed, acc, dt);
   if (wish.lengthSq() > 0.01) player.facing = lerpAngle(player.facing, Math.atan2(wish.x, wish.z), 1 - Math.exp(-12 * dt));
 
-  if (input.hit('Space') && player.onGround) {
-    player.vel.y = 9.6 * Math.sqrt(passive(el, 'jump') * (boost('speed') > 1 ? 1.6 : 1));
+  let jumped = false;
+  if (input.hit('Space') && (player.onGround || swimming)) {
+    player.vel.y = swimming ? 9 : 9.6 * Math.sqrt(passive(el, 'jump') * (boost('speed') > 1 ? 1.6 : 1));
     player.onGround = false;
-    sfx.jump();
+    jumped = true;
+    if (swimming) { sfx.splash(); particles.emit(tmpW.set(player.pos.x, WATER_Y + 0.2, player.pos.z), 30, { color: 0xb3e5fc, color2: 0xffffff, speed: 4, up: 4, gravity: 14, life: 0.8, size: 0.3 }); } else sfx.jump();
   }
   if (input.hit('KeyE')) useAbility();
   if (input.hit('KeyQ') || input.hit('Click')) attack();
@@ -752,16 +767,29 @@ function updatePlayer(dt) {
   EMOTES.forEach((e, i) => { if (input.hit('Digit' + (i + 1))) emote(e.id); });
 
   // terbang saat ultimate
-  const flying = ult && input.down('Space') && !player.onGround;
-  if (flying) player.vel.y = damp(player.vel.y, 9, 5, dt);
+  const flying = ult && input.down('Space') && !player.onGround && !swimming;
+  const hsNow = Math.hypot(player.vel.x, player.vel.z);
+  if (swimming && !jumped) {
+    // mengapung: bergerak = badan mendatar di permukaan, diam = mengapung tegak
+    const target = WATER_Y - (hsNow > 1.2 ? 0.55 : 1.95) + Math.sin(game.t * 2.2) * 0.06;
+    player.vel.y = damp(player.vel.y, (target - player.pos.y) * 4, 8, dt);
+    game.rippleT = (game.rippleT || 0) - dt;
+    if (game.rippleT <= 0) {
+      game.rippleT = hsNow > 1.2 ? 0.28 : 0.9;
+      effects.shockwave(tmpW.set(player.pos.x, WATER_Y + 0.03, player.pos.z), 0x9fdcff, hsNow > 1.2 ? 1.6 : 2.4);
+      if (hsNow > 1.2) particles.emit(tmpW.set(player.pos.x, WATER_Y + 0.15, player.pos.z), 4, { color: 0xffffff, color2: 0xb3e5fc, speed: 1.5, up: 1.5, gravity: 8, life: 0.5, size: 0.25 });
+    }
+  } else if (flying) player.vel.y = damp(player.vel.y, 9, 5, dt);
   else player.vel.y -= (ult ? 12 : 26) * dt;
   if (ult && player.vel.y < -6) player.vel.y = -6; // melayang turun
+  if (wading && hsNow > 2 && Math.random() < dt * 12) particles.emit(tmpW.set(player.pos.x, WATER_Y + 0.1, player.pos.z), 2, { color: 0xffffff, color2: 0xb3e5fc, speed: 1.5, up: 1.5, gravity: 8, life: 0.4, size: 0.22 });
 
   player.pos.x += (player.vel.x + player.dash.x) * dt;
   player.pos.z += (player.vel.z + player.dash.z) * dt;
   player.dash.multiplyScalar(Math.exp(-5 * dt));
 
   const col = collide(player.pos);
+  if (col.ground <= 0) col.ground = Math.min(col.ground, groundAt(player.pos.x, player.pos.z)); // dasar sungai/danau
   if (col.belt && player.onGround) {
     col.belt.localDir(1, 0, tmpD);
     player.pos.addScaledVector(tmpD, BELT_SPEED * dt);
@@ -795,7 +823,7 @@ function updatePlayer(dt) {
   player.prevFacing = player.facing;
   const accel = (hs - (player.prevHs ?? hs)) / Math.max(dt, 1e-4);
   player.prevHs = hs;
-  av.update(dt, { speed: hs, grounded: player.onGround, vy: player.vel.y, turn, accel, fly: ult && !player.onGround && (flying || player.vel.y > -3) });
+  av.update(dt, { speed: hs, grounded: player.onGround || swimming, vy: player.vel.y, turn, accel, swim: swimming, fly: !swimming && ult && !player.onGround && (flying || player.vel.y > -3) });
   const tip = av.tip();
   if (tip && Math.random() < dt * 12) { tip.getWorldPosition(tmpW); particles.emit(tmpW, 1, { ...el.fx, speed: 0.6, size: (el.fx.size || 0.4) * 0.6, life: 0.6 }); }
 
@@ -883,7 +911,7 @@ function updateRemotes(dt) {
     root.position.z = damp(root.position.z, r.target.z, 12, dt);
     if (root.position.distanceToSquared(r.target) > 400) root.position.copy(r.target);
     root.rotation.y = lerpAngle(root.rotation.y, r.ry, 1 - Math.exp(-12 * dt));
-    r.avatar.update(dt, { speed: r.s * 7.5, grounded: !r.g, vy: 0, fly: r.g && !!r.u });
+    r.avatar.update(dt, { speed: r.s * 7.5, grounded: !r.g || !!r.sw, vy: 0, swim: !!r.sw, fly: r.g && !!r.u && !r.sw });
     (r.center || (r.center = new THREE.Vector3())).copy(root.position).y += 1.3;
     if (Math.random() < dt * (r.u ? 40 : 10)) particles.emit(tmpW.set(root.position.x, root.position.y + 1.2 + Math.random(), root.position.z), 1, { ...r.el.fx, spread: 0.6, speed: (r.el.fx.speed || 1) * 0.4, size: (r.el.fx.size || 0.4) * 0.7 });
   }
@@ -897,7 +925,7 @@ function sendState(force = false) {
     x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2),
     r: +player.facing.toFixed(2), s: +player.speed.toFixed(2), g: !player.onGround,
     ab: game.abCount, c: Math.floor(game.cash), u: ultActive() ? 1 : 0, pq: game.pq,
-    k: game.costume, em: game.em,
+    k: game.costume, em: game.em, sw: player.swimming ? 1 : 0,
   };
   if (game.pd) st.pd = game.pd;
   mp.sendState(st, force);

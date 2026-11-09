@@ -1,6 +1,7 @@
 // Jalur sungai (tanpa dependensi supaya bisa dipakai pohon, rumput, pegunungan, dll.)
 // Sungai turun dari pegunungan timur laut -> berkelok di padang -> masuk danau -> keluar ke barat daya.
 import * as THREE from 'three';
+import { noise3 } from './noise.js';
 
 export const LAKE = { x: 104, z: 98, r: 21 };
 
@@ -37,4 +38,44 @@ export function distToRiver(x, z, maxD = 48) {
     for (const p of list) { const d = Math.hypot(p.x - x, p.z - z); if (d < best) best = d; }
   }
   return best;
+}
+
+// ---------------------------------------------------------------------
+// KEDALAMAN AIR (untuk berenang)
+// ---------------------------------------------------------------------
+export const WATER_Y = -0.35; // permukaan air sungai & danau
+
+// profil penampang sungai: [jarak dari tengah, tinggi dasar]
+export function riverProfile(w) {
+  const h = w / 2;
+  return [[h + 2.5, 0.02], [h + 0.6, 0], [h - 0.4, -1.0], [h - 1.8, -2.0], [(h - 1.8) * 0.5, -2.4], [0, -2.5]];
+}
+function interpProfile(prof, d) {
+  if (d >= prof[1][0]) return 0;
+  for (let i = 1; i < prof.length - 1; i++) {
+    const [d0, y0] = prof[i], [d1, y1] = prof[i + 1];
+    if (d >= d1) return y0 + (y1 - y0) * ((d0 - d) / (d0 - d1));
+  }
+  return prof[prof.length - 1][1];
+}
+
+// jari-jari danau (bentuk tidak bulat sempurna)
+export function lakeRadius(a) {
+  return LAKE.r * (0.85 + noise3(Math.cos(a) * 2, 3, Math.sin(a) * 2) * 0.35);
+}
+// profil danau: [jarak relatif terhadap tepi, tinggi dasar]
+export const LAKE_PROFILE = [[1.2, 0.02], [1.02, 0], [0.92, -1.2], [0.75, -2.6], [0.45, -3.2], [0, -3.4]];
+
+// tinggi dasar sungai/danau di titik (x, z); 0 = daratan biasa
+export function groundAt(x, z) {
+  let g = 0;
+  const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
+  if (dl < LAKE.r * 1.4) {
+    const f = dl / lakeRadius(Math.atan2(z - LAKE.z, x - LAKE.x));
+    g = Math.min(g, interpProfile(LAKE_PROFILE, f));
+  }
+  const w = riverWidth(x, z);
+  const d = distToRiver(x, z, w / 2 + 1);
+  if (d < w / 2 + 0.6) g = Math.min(g, interpProfile(riverProfile(w), d));
+  return g;
 }

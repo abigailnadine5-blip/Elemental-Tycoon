@@ -14,6 +14,7 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 - **Alam lebih realistis**: pohon oak, pinus & birch yang bergoyang tertiup angin, semak, batu, dan pegunungan bersalju di sekeliling peta
 - **Siklus Pagi – Siang – Senja – Malam** (1 hari = 12 menit: siang 8 menit, malam 4 menit), sama untuk semua pemain. Malam: bintang berkelip, bulan, kunang-kunang, lampu jalan & lampu markas menyala
 - **Hutan lebat** (oak, pinus, birch) dengan padang terbuka di sela-selanya, kayu tumbang, jamur & semak
+- **Bisa berenang** 🏊 di sungai & danau: air punya kedalaman (tepian landai, tengah dalam), gaya bebas saat bergerak, mengapung saat diam, percikan & riak air, Spasi untuk lompat keluar
 - **Sungai mengalir** dari ngarai pegunungan, berkelok di padang, masuk ke danau lalu keluar lagi — lengkap dengan tepian pasir, batu, batu pijakan & alang-alang
 - **Suasana hidup**: awan berarak, kawanan burung, danau beriak dengan dermaga & alang-alang, rumput bergoyang, warga NPC di plaza yang jalan-jalan, melambai, joget & duduk
 - **Animasi karakter ber-rig** (siku, lutut, pergelangan kaki): langkah jalan/lari sinkron, condong saat belok, mendarat, gerakan iseng saat diam, gaya jalan per kostum (ninja, berat, robot, penyihir...)
@@ -31,7 +32,7 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 |---|---|---|
 | Jalan | WASD / panah | Joystick kiri |
 | Lari | Shift | – |
-| Lompat | Spasi | Tombol ⤒ |
+| Lompat / keluar dari air | Spasi | Tombol ⤒ |
 | Putar kamera | Drag mouse | Geser layar kanan |
 | Zoom | Scroll | – |
 | Serangan elemen | Q / klik kiri | Tombol besar |

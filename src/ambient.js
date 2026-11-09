@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { noise3, addWind } from './nature.js';
 import { PLOT_POSITIONS } from './world.js';
 
-import { LAKE } from './riverpath.js';
+import { LAKE, lakeRadius } from './riverpath.js';
 export { LAKE };
 
 function canvasTex(w, h, draw, srgb = true) {
@@ -83,43 +83,12 @@ export function createAmbient(scene, quality, isFree) {
   fireflies.frustumCulled = false;
   scene.add(fireflies);
 
-  // ---------- danau ----------
-  const shape = new THREE.Shape();
-  for (let i = 0; i <= 64; i++) {
-    const a = (i / 64) * Math.PI * 2;
-    const rr = LAKE.r * (0.85 + noise3(Math.cos(a) * 2, 3, Math.sin(a) * 2) * 0.35);
-    const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
-    if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
-  }
-  const lakeGeo = new THREE.ShapeGeometry(shape, 24);
-  lakeGeo.rotateX(-Math.PI / 2);
-  const normTex = canvasTex(256, 256, (g, w, h) => {
-    const img = g.createImageData(w, h);
-    const H = (x, y) => noise3(x / 22, y / 22, 0.5) * 0.6 + noise3(x / 9, y / 9, 2.5) * 0.4;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const dx = H((x + 1) % w, y) - H((x - 1 + w) % w, y), dy = H(x, (y + 1) % h) - H(x, (y - 1 + h) % h);
-      const i = (y * w + x) * 4;
-      img.data[i] = 128 + dx * 255; img.data[i + 1] = 128 + dy * 255; img.data[i + 2] = 255; img.data[i + 3] = 255;
-    }
-    g.putImageData(img, 0, 0);
-  }, false);
-  normTex.wrapS = normTex.wrapT = THREE.RepeatWrapping;
-  normTex.repeat.set(5, 5);
-  const waterMat = new THREE.MeshStandardMaterial({ color: 0x1e5f80, roughness: 0.06, metalness: 0.2, normalMap: normTex, normalScale: new THREE.Vector2(0.6, 0.6), transparent: true, opacity: 0.92 });
-  const water = new THREE.Mesh(lakeGeo, waterMat);
-  water.position.set(LAKE.x, 0.08, LAKE.z);
-  water.receiveShadow = true;
-  scene.add(water);
-  const shore = new THREE.Mesh(lakeGeo, new THREE.MeshStandardMaterial({ color: 0xc8b98d, roughness: 1 }));
-  shore.scale.set(1.16, 1, 1.16);
-  shore.position.set(LAKE.x, 0.04, LAKE.z);
-  shore.receiveShadow = true;
-  scene.add(shore);
+  // ---------- danau (air & cekungan dibuat di river.js) ----------
   // dermaga kayu kecil
   const wood = new THREE.MeshStandardMaterial({ color: 0x7a5435, roughness: 0.85 });
   const dock = new THREE.Group();
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 9), wood); deck.position.y = 0.5; deck.castShadow = deck.receiveShadow = true; dock.add(deck);
-  for (const x of [-1, 1]) for (const z of [-4, 0, 4]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4), wood); p.position.set(x, 0, z); dock.add(p); }
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 9), wood); deck.position.y = 0.35; deck.castShadow = deck.receiveShadow = true; dock.add(deck);
+  for (const x of [-1, 1]) for (const z of [-4, 0, 4]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.6), wood); p.position.set(x, -1.5, z); dock.add(p); }
   dock.position.set(LAKE.x - LAKE.r * 0.6, 0, LAKE.z - LAKE.r * 0.6);
   dock.rotation.y = Math.PI / 4;
   scene.add(dock);
@@ -129,7 +98,7 @@ export function createAmbient(scene, quality, isFree) {
   addWind(reedMat, 0.05);
   const reeds = new THREE.InstancedMesh(reedGeo, reedMat, 160);
   for (let i = 0; i < 160; i++) {
-    const a = Math.random() * Math.PI * 2, r = LAKE.r * (0.95 + Math.random() * 0.25);
+    const a = Math.random() * Math.PI * 2, r = lakeRadius(a) * (1.06 + Math.random() * 0.2);
     dummy.position.set(LAKE.x + Math.cos(a) * r, 0, LAKE.z + Math.sin(a) * r);
     dummy.rotation.set((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3);
     dummy.scale.setScalar(0.6 + Math.random() * 0.8);
@@ -246,8 +215,6 @@ export function createAmbient(scene, quality, isFree) {
       ffMat.size = 0.4 + Math.sin(t * 3) * 0.1;
     }
     // riak air
-    normTex.offset.x = t * 0.012; normTex.offset.y = t * 0.008;
-    waterMat.color.copy(cA.set(0x1e5f80).lerp(cB.set(0x7a4a3a), golden * 0.4).lerp(cB.set(0x07121e), night * 0.8));
     // lampu jalan menyala saat gelap
     bulbMat.emissiveIntensity = 0.1 + night * 2.4 + golden * 0.6;
     haloMat.opacity = Math.min(0.7, night * 0.75 + golden * 0.15);

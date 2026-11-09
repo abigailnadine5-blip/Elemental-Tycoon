@@ -47,6 +47,7 @@ export const sfx = {
   error() { tone(160, 0.25, 'sawtooth', 0.06, 110); },
   jump() { tone(300, 0.12, 'sine', 0.06, 600); },
   click() { tone(700, 0.05, 'triangle', 0.06); },
+  splash() { noise(0.45, 0.28, 650); tone(220, 0.2, 'sine', 0.05, 90); },
   hit() { noise(0.3, 0.3, 300); tone(140, 0.25, 'square', 0.06, 70); },
   ult() { tone(220, 0.9, 'sawtooth', 0.08, 880); tone(330, 0.9, 'triangle', 0.08, 1320, 0.1); noise(1.2, 0.3, 700); },
   attack(id) {

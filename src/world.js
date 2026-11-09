@@ -5,7 +5,7 @@ import { ELEMENTS } from './elements.js';
 import { createNature } from './nature.js';
 import { createDayNight } from './daynight.js';
 import { createAmbient, LAKE } from './ambient.js';
-import { createRiver } from './river.js';
+import { createRiver, applyWaterHoles } from './river.js';
 import { distToRiver, riverWidth } from './riverpath.js';
 
 export const PLOT_POSITIONS = [
@@ -28,6 +28,7 @@ export function createWorld(scene, renderer, quality) {
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  applyWaterHoles(ground.material); // lubang untuk sungai & danau yang bisa direnangi
   scene.add(ground);
 
   const concreteMat = new THREE.MeshStandardMaterial({ map: concreteTexture(1), roughness: 0.92, color: 0xcfcfcf });

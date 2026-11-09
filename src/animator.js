@@ -106,6 +106,24 @@ function flyPose(t) {
   return { ...REST, lean: 1.2 + f, aLf: 2.95, aRf: 2.6, aLe: 0.05, aRe: 0.35, aLo: 0.12, aRo: 0.25, lLf: -0.12, lRf: 0.05, lLk: 0.15, lRk: 0.5, lLa: -0.5, lRa: -0.5, hP: -0.95, y: 0.4 };
 }
 
+// berenang: gaya bebas saat bergerak, mengapung (kaki mengayuh) saat diam
+function swimPose(t, move) {
+  const ph = t * 4.2;
+  const stroke = {
+    ...REST, lean: 1.35, y: 0, hP: -0.95, hY: Math.sin(ph) * 0.35, wTwist: Math.sin(ph) * 0.18, roll: Math.sin(ph) * 0.12,
+    aLf: 1.6 + Math.sin(ph) * 1.5, aRf: 1.6 - Math.sin(ph) * 1.5, aLe: 0.25 + Math.max(0, Math.cos(ph)) * 0.6, aRe: 0.25 + Math.max(0, -Math.cos(ph)) * 0.6, aLo: 0.15, aRo: 0.15,
+    lLf: Math.sin(t * 11) * 0.3, lRf: -Math.sin(t * 11) * 0.3, lLk: 0.15, lRk: 0.15, lLa: -0.6, lRa: -0.6,
+  };
+  const tread = {
+    ...REST, lean: 0.12, y: -0.04, hP: -0.1,
+    aLo: 1.15 + Math.sin(t * 3) * 0.3, aRo: 1.15 + Math.sin(t * 3 + 0.5) * 0.3, aLe: 0.5, aRe: 0.5, aLf: 0.35 + Math.cos(t * 3) * 0.2, aRf: 0.35 + Math.cos(t * 3 + 0.5) * 0.2,
+    lLf: 0.3 + Math.sin(t * 4) * 0.4, lRf: 0.3 - Math.sin(t * 4) * 0.4, lLk: 0.7 + Math.cos(t * 4) * 0.3, lRk: 0.7 - Math.cos(t * 4) * 0.3,
+  };
+  const out = {};
+  for (const ch of CHANNELS) out[ch] = lerp(tread[ch] ?? 0, stroke[ch] ?? 0, move);
+  return out;
+}
+
 function airPose(vy, t) {
   const k = smooth(4, -7, vy); // 0 naik, 1 jatuh
   const flap = Math.sin(t * 15) * 0.18 * k;
@@ -200,7 +218,7 @@ export class Animator {
     this.S = STYLES[style] || STYLES.normal;
     this.cur = { ...REST };
     this.phase = 0;
-    this.w = 0; this.r = 0; this.air = 0; this.fly = 0;
+    this.w = 0; this.r = 0; this.air = 0; this.fly = 0; this.swim = 0;
     this.actions = [];
     this.t = Math.random() * 10;
     this.look = { y: 0, p: 0, ty: 0, tp: 0, next: 2 };
@@ -236,6 +254,7 @@ export class Animator {
     this.r = lerp(this.r, smooth(6, 10.5, speed), 1 - Math.exp(-6 * dt));
     this.air = lerp(this.air, grounded ? 0 : 1, 1 - Math.exp(-(grounded ? 22 : 12) * dt));
     this.fly = lerp(this.fly, inp.fly ? 1 : 0, 1 - Math.exp(-6 * dt));
+    this.swim = lerp(this.swim, inp.swim ? 1 : 0, 1 - Math.exp(-7 * dt));
 
     // fase langkah mengikuti jarak tempuh (anti-meluncur)
     const cycle = lerp(2.5, 4.1, this.r) / (S.cadence || 1);
@@ -265,11 +284,13 @@ export class Animator {
     const loco = locoPose(S, this.phase, this.w, this.r, T);
     const air = airPose(inp.vy || 0, T);
     const fly = this.fly > 0.01 ? flyPose(T) : null;
+    const swim = this.swim > 0.01 ? swimPose(T, smooth(0.8, 2.5, speed)) : null;
     const out = {};
     for (const ch of CHANNELS) {
       let v = lerp(idle[ch] ?? REST[ch], loco[ch] ?? REST[ch], this.w);
       v = lerp(v, air[ch] ?? REST[ch], this.air);
       if (fly) v = lerp(v, fly[ch] ?? REST[ch], this.fly);
+      if (swim) v = lerp(v, swim[ch] ?? REST[ch], this.swim);
       out[ch] = v;
     }
     // condong saat berbelok & berakselerasi
