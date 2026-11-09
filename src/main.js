@@ -9,7 +9,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ELEMENTS, getElement, passive, hex } from './elements.js';
 import { createWorld, PLOT_POSITIONS, WORLD_LIMIT } from './world.js';
 import { Plot, START_CASH, BELT_SPEED, validItems } from './tycoon.js';
-import { createAvatar, disposeAvatar } from './character.js';
+import { createAvatar, disposeAvatar, COSTUMES, costumeName, EMOTES } from './character.js';
+import { ElementFX } from './elementfx.js';
 import { Particles, Effects } from './particles.js';
 import { Powers, Crystals } from './powers.js';
 import { makeLabel } from './textures.js';
@@ -66,6 +67,7 @@ const particles = new Particles(scene);
 const effects = new Effects(scene);
 const plots = PLOT_POSITIONS.map((p, i) => new Plot(scene, i, p, particles));
 const powers = new Powers(scene, particles, effects);
+const elFx = new ElementFX(scene, particles, effects);
 const crystals = new Crystals(scene, particles, world.isFree, ELEMENTS.map((e) => e.color));
 const input = new Input(canvas);
 
@@ -94,6 +96,9 @@ const game = {
   lastPad: null,
   shake: 0,
   hitCd: 0,
+  costume: 'standar',
+  emSeq: 0,
+  em: '',
 };
 let mp = offline('');
 const player = {
@@ -132,6 +137,10 @@ function remoteMods(el) {
 // ---------------------------------------------------------------------
 const SAVE_KEY = (id) => `elementalTycoon:v1:${id}`;
 function loadSave(id) { try { return JSON.parse(localStorage.getItem(SAVE_KEY(id)) || 'null'); } catch (e) { return null; } }
+const COSTUME_KEY = (id) => `elementalTycoon:costume:${id}`;
+function loadCostume(id) { try { return localStorage.getItem(COSTUME_KEY(id)) || 'standar'; } catch (e) { return 'standar'; } }
+function saveCostume(id, c) { try { localStorage.setItem(COSTUME_KEY(id), c); } catch (e) { /* */ } }
+
 function save() {
   if (game.state !== 'playing' || !game.plot) return;
   try {
@@ -173,9 +182,33 @@ function buildCards() {
   }
 }
 
+let selCostume = 'standar';
+function costumeButtons(el, current, onPick) {
+  const wrap = document.createElement('div');
+  wrap.className = 'costumes';
+  for (const c of COSTUMES) {
+    const b = document.createElement('button');
+    b.className = 'costume' + (c.id === current ? ' sel' : '');
+    b.innerHTML = `<span>${c.icon}</span><b>${c.id === 'standar' ? 'Standar' : c.name + ' ' + el.name}</b>`;
+    b.onclick = () => { sfx.click(); wrap.querySelectorAll('.costume').forEach((x) => x.classList.remove('sel')); b.classList.add('sel'); onPick(c.id); };
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+function showPreview(el) {
+  if (preview) disposeAvatar(preview);
+  preview = createAvatar(el, { costume: selCostume });
+  preview.root.position.copy(PREVIEW_POS);
+  scene.add(preview.root);
+  preview.play('victory');
+  particles.emit(PREVIEW_POS.clone().setY(1.5), 60, { ...el.fx, speed: (el.fx.speed || 2) * 2 + 2, spread: 0.5 });
+  effects.shockwave(PREVIEW_POS, el.color, 5);
+}
+
 function selectElement(el, card) {
   sfx.click();
   selected = el;
+  selCostume = loadCostume(el.id);
   document.querySelectorAll('.el-card').forEach((c) => c.classList.remove('sel'));
   card.classList.add('sel');
   const d = $('elementDetail');
@@ -185,15 +218,12 @@ function selectElement(el, card) {
     <div class="d-row"><b>Pasif</b><span>${el.passiveText}</span></div>
     <div class="d-row"><b>[Q] Serang</b><span><i>${el.attack.name}</i></span></div>
     <div class="d-row"><b>[E] Skill</b><span><i>${el.ability.name}</i> — ${el.ability.text}</span></div>
-    <div class="d-row"><b>[F] Ultimate</b><span><i>${el.ult.name}</i> — terbang + semua bonus x1.5</span></div>`;
+    <div class="d-row"><b>[F] Ultimate</b><span><i>${el.ult.name}</i> — terbang + semua bonus x1.5</span></div>
+    <div class="d-row"><b>👕 Kostum</b><span id="costumeLabel">${costumeName(selCostume, el)}</span></div>`;
+  d.appendChild(costumeButtons(el, selCostume, (cid) => { selCostume = cid; saveCostume(el.id, cid); $('costumeLabel').textContent = costumeName(cid, el); showPreview(el); }));
   $('playBtn').disabled = false;
   $('playBtn').style.setProperty('--c', hex(el.color));
-  if (preview) disposeAvatar(preview);
-  preview = createAvatar(el);
-  preview.root.position.copy(PREVIEW_POS);
-  scene.add(preview.root);
-  particles.emit(PREVIEW_POS.clone().setY(1.5), 60, { ...el.fx, speed: (el.fx.speed || 2) * 2 + 2, spread: 0.5 });
-  effects.shockwave(PREVIEW_POS, el.color, 5);
+  showPreview(el);
 }
 
 function show(id) {
@@ -270,27 +300,28 @@ const handlers = {
     if (!d || typeof d.x !== 'number') return;
     const el = getElement(d.e);
     let r = remotes.get(id);
-    if (r && r.el.id !== el.id) { removeRemote(id); r = null; }
+    if (r && (r.el.id !== el.id || r.k !== (d.k || 'standar'))) { removeRemote(id); r = null; }
     if (!r) {
-      const av = createAvatar(el);
+      const av = createAvatar(el, { costume: d.k || 'standar' });
       const label = makeLabel([{ text: d.n || 'Pemain', color: hex(el.glow), size: 42 }], { scale: 0.9 });
       label.sprite.position.y = 3.3;
       av.root.add(label.sprite);
       av.root.position.set(d.x, d.y, d.z);
       scene.add(av.root);
-      r = { id, avatar: av, label, el, target: new THREE.Vector3(d.x, d.y, d.z), ry: d.r || 0, s: 0, g: false, ab: d.ab, pq: d.pq, n: d.n, c: d.c || 0, u: 0 };
+      r = { id, avatar: av, label, el, k: d.k || 'standar', target: new THREE.Vector3(d.x, d.y, d.z), ry: d.r || 0, s: 0, g: false, ab: d.ab, pq: d.pq, em: d.em, n: d.n, c: d.c || 0, u: 0 };
       remotes.set(id, r);
       if (game.state === 'playing') toast(`👋 ${d.n || 'Pemain'} (${el.name}) bergabung`, hex(el.glow));
     }
     r.target.set(d.x, d.y, d.z);
     r.ry = d.r || 0; r.s = d.s || 0; r.g = !!d.g; r.c = d.c || 0;
     if (d.n !== r.n) { r.n = d.n; r.label.set([{ text: d.n || 'Pemain', color: hex(el.glow), size: 42 }]); }
-    if (d.ab !== r.ab) { r.ab = d.ab; abilityFx(r.avatar.root.position, el); }
-    if (!!d.u !== !!r.u) { r.u = d.u; r.avatar.setPower(!!d.u); if (d.u) ultFx(r.avatar.root.position, el); }
+    if (d.ab !== r.ab) { r.ab = d.ab; abilityFx(r.avatar.root.position, el); r.avatar.play('skill'); elFx.skill(el, r.avatar.root.position); }
+    if (!!d.u !== !!r.u) { r.u = d.u; r.avatar.setPower(!!d.u); if (d.u) { ultFx(r.avatar.root.position, el); r.avatar.play('transform'); } }
+    if (d.em && d.em !== r.em) { r.em = d.em; const eid = String(d.em).split(':')[0]; r.avatar.play(eid); elFx.emote(el, r.avatar.root.position, eid); }
     if (d.pq !== r.pq) {
       r.pq = d.pq;
       if (Array.isArray(d.pd) && d.pd.length === 6) {
-        r.avatar.punch();
+        r.avatar.attack();
         powers.fire({ local: false, el, name: r.n || 'Pemain', id }, new THREE.Vector3(d.pd[0], d.pd[1], d.pd[2]), new THREE.Vector3(d.pd[3], d.pd[4], d.pd[5]).normalize(), powerWorld);
       }
     }
@@ -372,12 +403,10 @@ async function startGame(el) {
   items.forEach((id) => plot.build(id, false));
   game.plot = plot;
 
-  player.avatar = createAvatar(el);
-  player.label = makeLabel([{ text: game.name, color: hex(el.glow), size: 42 }], { scale: 0.9 });
-  player.label.sprite.position.y = 3.3;
-  player.avatar.root.add(player.label.sprite);
-  scene.add(player.avatar.root);
+  game.costume = loadCostume(el.id);
+  buildPlayerAvatar();
   respawn();
+  buildHudPanels();
 
   $('elIcon').textContent = el.icon;
   $('elName').textContent = el.name;
@@ -398,6 +427,53 @@ async function startGame(el) {
   if (!items.length) setTimeout(() => toast('Injak tombol hijau "Dropper I" untuk mulai!', '#7dff9b'), 1500);
   setTimeout(() => toast('💎 Hancurkan Kristal Elemen di padang rumput dengan [Q]!', '#b3e5fc'), 6000);
   abilityFx(player.pos, el);
+}
+
+function buildPlayerAvatar() {
+  const el = game.element;
+  if (player.avatar) { player.label.sprite.removeFromParent(); disposeAvatar(player.avatar); }
+  player.avatar = createAvatar(el, { costume: game.costume });
+  if (!player.label) player.label = makeLabel([{ text: game.name, color: hex(el.glow), size: 42 }], { scale: 0.9 });
+  player.label.sprite.position.y = 3.3;
+  player.avatar.root.add(player.label.sprite);
+  player.avatar.root.position.copy(player.pos);
+  scene.add(player.avatar.root);
+}
+
+function buildHudPanels() {
+  const el = game.element;
+  const cp = $('costumePanel');
+  cp.style.setProperty('--c', hex(el.color));
+  cp.innerHTML = '<div class="panel-title">👕 Lemari Kostum</div>';
+  cp.appendChild(costumeButtons(el, game.costume, (cid) => {
+    game.costume = cid; saveCostume(el.id, cid);
+    buildPlayerAvatar();
+    player.avatar.play('transform');
+    abilityFx(player.pos, el);
+    toast(`👕 ${costumeName(cid, el)}!`, hex(el.glow));
+    sendState(true);
+  }));
+  const ep = $('emotePanel');
+  ep.innerHTML = '<div class="panel-title">😀 Emote</div>';
+  EMOTES.forEach((e, i) => {
+    const b = document.createElement('button');
+    b.className = 'emote';
+    b.innerHTML = `<span>${e.icon}</span><b>${e.name}</b><i>${i + 1}</i>`;
+    b.onclick = () => { emote(e.id); ep.classList.add('hidden'); };
+    ep.appendChild(b);
+  });
+}
+$('costumeBtn').onclick = () => { $('costumePanel').classList.toggle('hidden'); $('emotePanel').classList.add('hidden'); };
+$('emoteBtn').onclick = () => { $('emotePanel').classList.toggle('hidden'); $('costumePanel').classList.add('hidden'); };
+
+function emote(id) {
+  if (game.state !== 'playing') return;
+  player.avatar.play(id);
+  elFx.emote(game.element, player.pos, id);
+  game.emSeq++;
+  game.em = `${id}:${game.emSeq}`;
+  sfx.click();
+  sendState(true);
 }
 
 function respawn() {
@@ -472,7 +548,7 @@ function attack() {
   const sc = ultActive() ? 1.25 : 1;
   const origin = player.pos.clone().add(new THREE.Vector3(0, 1.7 * sc, 0)).addScaledVector(aim, 0.9);
   powers.fire({ local: true, el, name: game.name, id: mp.id }, origin, aim.clone(), powerWorld);
-  player.avatar.punch();
+  player.avatar.attack();
   game.pq++;
   game.pd = [origin.x, origin.y, origin.z, aim.x, aim.y, aim.z].map((n) => +n.toFixed(2));
   sfx.attack(el.id);
@@ -486,6 +562,7 @@ function ultimate() {
   game.ultUntil = game.t + el.ult.duration;
   game.atkCd = 0;
   ultFx(player.pos, el);
+  player.avatar.play('transform');
   game.shake = 0.5;
   player.vel.y = 10; player.onGround = false;
   sfx.ult();
@@ -500,6 +577,8 @@ function useAbility() {
   game.abCount++;
   const now = game.t;
   abilityFx(player.pos, el);
+  player.avatar.play('skill');
+  elFx.skill(el, player.pos);
   sfx.ability(el.id);
   switch (ab.type) {
     case 'dropBoost': game.boosts.drop = { mult: ab.mult, until: now + ab.duration }; break;
@@ -659,6 +738,7 @@ function updatePlayer(dt) {
   if (input.hit('KeyQ') || input.hit('Click')) attack();
   if (input.hit('KeyF')) ultimate();
   if (input.hit('KeyR')) respawn();
+  EMOTES.forEach((e, i) => { if (input.hit('Digit' + (i + 1))) emote(e.id); });
 
   // terbang saat ultimate
   const flying = ult && input.down('Space') && !player.onGround;
@@ -675,6 +755,7 @@ function updatePlayer(dt) {
     col.belt.localDir(1, 0, tmpD);
     player.pos.addScaledVector(tmpD, BELT_SPEED * dt);
   }
+  const wasAir = !player.onGround, fallV = player.vel.y;
   player.pos.y += player.vel.y * dt;
   if (player.pos.y + HEIGHT > col.ceil) { player.pos.y = col.ceil - HEIGHT; if (player.vel.y > 0) player.vel.y = 0; }
   if (player.pos.y <= col.ground) {
@@ -683,6 +764,10 @@ function updatePlayer(dt) {
     player.onGround = true;
   } else if (player.pos.y > col.ground + 0.08) {
     player.onGround = false;
+  }
+  if (wasAir && player.onGround && fallV < -9) {
+    particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.2, player.pos.z), 18, { ...el.fx, speed: 4, up: 1, spread: 0.4, life: 0.6 });
+    effects.shockwave(player.pos, el.color, 2.5);
   }
   player.pos.x = clamp(player.pos.x, -WORLD_LIMIT, WORLD_LIMIT);
   player.pos.z = clamp(player.pos.z, -WORLD_LIMIT, WORLD_LIMIT);
@@ -695,7 +780,9 @@ function updatePlayer(dt) {
   av.root.position.copy(player.pos);
   av.root.rotation.y = player.facing;
   av.setPower(ult);
-  av.update(dt, player.speed, !player.onGround);
+  av.update(dt, player.speed, !player.onGround, ult && !player.onGround && (flying || player.vel.y > -3));
+  const tip = av.tip();
+  if (tip && Math.random() < dt * 12) { tip.getWorldPosition(tmpW); particles.emit(tmpW, 1, { ...el.fx, speed: 0.6, size: (el.fx.size || 0.4) * 0.6, life: 0.6 }); }
 
   // aura elemen
   if (Math.random() < dt * (ult ? 70 : 22)) {
@@ -781,7 +868,7 @@ function updateRemotes(dt) {
     root.position.z = damp(root.position.z, r.target.z, 12, dt);
     if (root.position.distanceToSquared(r.target) > 400) root.position.copy(r.target);
     root.rotation.y = lerpAngle(root.rotation.y, r.ry, 1 - Math.exp(-12 * dt));
-    r.avatar.update(dt, r.s, r.g);
+    r.avatar.update(dt, r.s, r.g, r.g && !!r.u);
     (r.center || (r.center = new THREE.Vector3())).copy(root.position).y += 1.3;
     if (Math.random() < dt * (r.u ? 40 : 10)) particles.emit(tmpW.set(root.position.x, root.position.y + 1.2 + Math.random(), root.position.z), 1, { ...r.el.fx, spread: 0.6, speed: (r.el.fx.speed || 1) * 0.4, size: (r.el.fx.size || 0.4) * 0.7 });
   }
@@ -795,6 +882,7 @@ function sendState(force = false) {
     x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2),
     r: +player.facing.toFixed(2), s: +player.speed.toFixed(2), g: !player.onGround,
     ab: game.abCount, c: Math.floor(game.cash), u: ultActive() ? 1 : 0, pq: game.pq,
+    k: game.costume, em: game.em,
   };
   if (game.pd) st.pd = game.pd;
   mp.sendState(st, force);
@@ -863,6 +951,7 @@ function loop() {
   }
   updateRemotes(dt);
   powers.update(dt, powerWorld);
+  elFx.update(dt);
   crystals.update(dt, game.state === 'playing' ? player.pos : null);
   updateCamera(dt);
   world.update(dt, game.t, game.state === 'playing' ? player.pos : camLook);

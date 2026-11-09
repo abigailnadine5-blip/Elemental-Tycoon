@@ -9,6 +9,9 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 - Tiap elemen punya **baju khas** (motif kaos, sarung tangan, sepatu, ikat pinggang, aksesori kepala & item punggung: jubah, sayap, jetpack, tabung, perisai...)
 - **3 kekuatan per elemen**: **[Q] Serangan** (bola api, laser, petir, tornado, shuriken, dll.), **[E] Skill tycoon**, **[F] Ultimate** (berubah wujud, bisa terbang, semua bonus x1.5)
 - **Markas bertingkat**: Lantai 1 (pabrik) → **Lantai 2 (Lab)** → **Lantai 3 (Reaktor)** → **Rooftop** (Menara Elemen, Kolam, Patung Legenda) — lengkap dengan tangga, dinding kaca, conveyor & dropper di tiap lantai
+- **Kostum baru** untuk tiap elemen: 🥷 Ninja, 🛡️ Kesatria, 🧙 Penyihir, ⛩️ Samurai, 🤖 Mecha (contoh: *Ninja Listrik*, *Ninja Bayangan*, *Kesatria Cahaya*, *Penyihir Api*) — pilih di menu atau lewat tombol 👕 di dalam game
+- **Animasi**: pose serangan berbeda (lempar, tebas, rapal, pukul, hantam), efek skill unik tiap elemen, perubahan wujud Ultimate + benda mengorbit, terbang gaya superhero, 5 emote (👋 Lambai, 💃 Joget, 🫡 Hormat, 💪 Pamer, 🏆 Menang)
+- **Alam lebih realistis**: pohon oak, pinus & birch yang bergoyang tertiup angin, semak, batu, dan pegunungan bersalju di sekeliling peta
 - **Kristal Elemen** muncul di padang rumput — hancurkan dengan serangan [Q] untuk bonus uang
 - Grafik "realistis": langit fisik, bayangan lembut, refleksi lingkungan (PBR), bloom/glow, kabut, pohon & gunung
 - Gameplay tycoon klasik: **Dropper → Conveyor → Upgrader → Collector → Pad Uang**
@@ -29,6 +32,8 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 | Serangan elemen | Q / klik kiri | Tombol besar |
 | Skill tycoon | E | Tombol skill |
 | Ultimate (terbang: tahan Spasi) | F | Tombol 👑 |
+| Emote | 1–5 | 😀 |
+| Ganti kostum | tombol 👕 | 👕 |
 | Chat | Enter / T | 💬 |
 | Kembali ke markas | R | – |
 
@@ -120,7 +125,9 @@ database.rules.json   aturan keamanan Realtime Database
 src/
   main.js             loop game, kamera, fisika pemain, skill, UI, sinkron multiplayer
   elements.js         data 12 elemen
-  character.js        avatar blocky ala Roblox + baju & aksesori tiap elemen
+  character.js        avatar blocky ala Roblox + baju, kostum & animasi
+  elementfx.js        efek visual skill [E] & emote tiap elemen
+  nature.js           pohon realistis, angin, semak, batu, pegunungan
   tycoon.js           plot bertingkat, item, dropper/conveyor/upgrader/collector, pad beli
   world.js            langit, cahaya, tanah, pohon, plaza
   particles.js        sistem partikel & efek (petir, gelombang kejut)

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { grassTexture, concreteTexture } from './textures.js';
 import { ELEMENTS } from './elements.js';
+import { createNature } from './nature.js';
 
 export const PLOT_POSITIONS = [
   new THREE.Vector3(0, 0, -58),
@@ -35,7 +36,7 @@ export function createWorld(scene, renderer, quality) {
   scene.environment = envRT.texture;
   pmrem.dispose();
 
-  scene.fog = new THREE.Fog(0xa9c4dc, 140, 520);
+  scene.fog = new THREE.Fog(0xa9c4dc, 180, 900);
 
   const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x4b6a2e, 0.4);
   scene.add(hemi);
@@ -119,73 +120,19 @@ export function createWorld(scene, renderer, quality) {
     obelisks.push(orb);
   });
 
-  // ---------- Pohon & batu (instanced) ----------
+  // ---------- Alam: pohon realistis, semak, batu, pegunungan ----------
   const isFree = (x, z) => {
     if (Math.hypot(x, z) < 22) return false;
     if (Math.abs(x) < 6 || Math.abs(z) < 6) { if (Math.hypot(x, z) < 90) return false; }
     for (const p of PLOT_POSITIONS) if (Math.abs(x - p.x) < 27 && Math.abs(z - p.z) < 27) return false;
     return true;
   };
-  const treeCount = quality.trees;
-  const trunkGeo = new THREE.CylinderGeometry(0.28, 0.45, 4, 7);
-  trunkGeo.translate(0, 2, 0);
-  const leafGeo = new THREE.IcosahedronGeometry(2.3, 1);
-  const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x5b3b24, roughness: 1 }), treeCount);
-  const leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true }), treeCount * 2);
-  const dummy = new THREE.Object3D();
-  const col = new THREE.Color();
-  let n = 0, tries = 0;
-  while (n < treeCount && tries < treeCount * 30) {
-    tries++;
-    const r = 30 + Math.sqrt(Math.random()) * 220, a = Math.random() * Math.PI * 2;
-    const x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (!isFree(x, z)) continue;
-    const s = 0.8 + Math.random() * 0.8;
-    dummy.position.set(x, 0, z); dummy.rotation.set(0, Math.random() * 6, 0); dummy.scale.set(s, s, s); dummy.updateMatrix();
-    trunks.setMatrixAt(n, dummy.matrix);
-    for (let k = 0; k < 2; k++) {
-      dummy.position.set(x + (Math.random() - 0.5) * s, (4 + k * 1.6) * s, z + (Math.random() - 0.5) * s);
-      const ls = s * (k ? 0.75 : 1) * (0.9 + Math.random() * 0.3);
-      dummy.scale.set(ls, ls * 0.9, ls); dummy.updateMatrix();
-      leaves.setMatrixAt(n * 2 + k, dummy.matrix);
-      col.setHSL(0.24 + Math.random() * 0.08, 0.45 + Math.random() * 0.2, 0.22 + Math.random() * 0.12);
-      leaves.setColorAt(n * 2 + k, col);
-    }
-    n++;
-  }
-  trunks.count = n; leaves.count = n * 2;
-  trunks.castShadow = leaves.castShadow = true;
-  trunks.receiveShadow = leaves.receiveShadow = true;
-  scene.add(trunks, leaves);
-
-  const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8a8a84, roughness: 0.95, flatShading: true }), 120);
-  let rn = 0;
-  for (let i = 0; i < 600 && rn < 120; i++) {
-    const r = 25 + Math.random() * 200, a = Math.random() * Math.PI * 2;
-    const x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (!isFree(x, z)) continue;
-    const s = 0.3 + Math.random() * 1.3;
-    dummy.position.set(x, s * 0.3, z); dummy.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); dummy.scale.set(s, s * 0.7, s); dummy.updateMatrix();
-    rocks.setMatrixAt(rn++, dummy.matrix);
-  }
-  rocks.count = rn;
-  rocks.castShadow = rocks.receiveShadow = true;
-  scene.add(rocks);
-
-  // Pegunungan jauh
-  const mtMat = new THREE.MeshStandardMaterial({ color: 0x6d7f8f, roughness: 1, flatShading: true });
-  for (let i = 0; i < 26; i++) {
-    const a = (i / 26) * Math.PI * 2 + Math.random() * 0.1;
-    const h = 40 + Math.random() * 70;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(30 + Math.random() * 40, h, 6), mtMat);
-    m.position.set(Math.sin(a) * 330, h / 2 - 2, Math.cos(a) * 330);
-    m.rotation.y = Math.random() * 3;
-    scene.add(m);
-  }
+  const nature = createNature(scene, quality, isFree);
 
   // ---------- Update ----------
   const tmpCol = new THREE.Color();
   function update(dt, t, focus) {
+    nature.update(dt, t);
     sun.position.copy(focus).addScaledVector(sunDir, 120);
     sun.target.position.copy(focus);
     crystal.rotation.y += dt * 0.6;
