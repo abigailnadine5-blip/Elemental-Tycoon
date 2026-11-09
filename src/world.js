@@ -1,9 +1,10 @@
 // Lingkungan: langit realistis, matahari + bayangan, tanah rumput, pohon, batu, plaza tengah.
 import * as THREE from 'three';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { grassTexture, concreteTexture } from './textures.js';
 import { ELEMENTS } from './elements.js';
 import { createNature } from './nature.js';
+import { createDayNight } from './daynight.js';
+import { createAmbient, LAKE } from './ambient.js';
 
 export const PLOT_POSITIONS = [
   new THREE.Vector3(0, 0, -58),
@@ -14,42 +15,9 @@ export const PLOT_POSITIONS = [
 export const WORLD_LIMIT = 190;
 
 export function createWorld(scene, renderer, quality) {
-  // ---------- Langit & cahaya ----------
-  const sunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(52), THREE.MathUtils.degToRad(145));
-  const makeSky = () => {
-    const s = new Sky();
-    s.scale.setScalar(4500);
-    const u = s.material.uniforms;
-    u.turbidity.value = 3.5;
-    u.rayleigh.value = 1.4;
-    u.mieCoefficient.value = 0.004;
-    u.mieDirectionalG.value = 0.82;
-    u.sunPosition.value.copy(sunDir);
-    return s;
-  };
-  scene.add(makeSky());
-
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const envScene = new THREE.Scene();
-  envScene.add(makeSky());
-  const envRT = pmrem.fromScene(envScene, 0, 1, 5000);
-  scene.environment = envRT.texture;
-  pmrem.dispose();
-
-  scene.fog = new THREE.Fog(0xa9c4dc, 180, 900);
-
-  const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x4b6a2e, 0.4);
-  scene.add(hemi);
-
-  const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
-  sun.castShadow = true;
-  const sm = quality.shadowSize;
-  sun.shadow.mapSize.set(sm, sm);
-  const sc = sun.shadow.camera;
-  sc.left = sc.bottom = -45; sc.right = sc.top = 45; sc.near = 1; sc.far = 260;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.03;
-  scene.add(sun, sun.target);
+  // ---------- Langit, matahari/bulan & siklus siang-malam ----------
+  const dn = createDayNight(scene, renderer, quality);
+  const { sun, sunDir } = dn;
 
   // ---------- Tanah ----------
   const ground = new THREE.Mesh(
@@ -123,18 +91,23 @@ export function createWorld(scene, renderer, quality) {
   // ---------- Alam: pohon realistis, semak, batu, pegunungan ----------
   const isFree = (x, z) => {
     if (Math.hypot(x, z) < 22) return false;
+    if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 7) return false;
     if (Math.abs(x) < 6 || Math.abs(z) < 6) { if (Math.hypot(x, z) < 90) return false; }
     for (const p of PLOT_POSITIONS) if (Math.abs(x - p.x) < 27 && Math.abs(z - p.z) < 27) return false;
     return true;
   };
   const nature = createNature(scene, quality, isFree);
+  const ambient = createAmbient(scene, quality, isFree);
 
   // ---------- Update ----------
   const tmpCol = new THREE.Color();
-  function update(dt, t, focus) {
+  function update(dt, t, focus, camPos = focus) {
     nature.update(dt, t);
-    sun.position.copy(focus).addScaledVector(sunDir, 120);
-    sun.target.position.copy(focus);
+    dn.update(dt, t, focus, camPos);
+    ambient.update(dt, t, dn.state, camPos);
+    const night = dn.state.night;
+    crystalMat.emissiveIntensity = 1.2 + night * 1.5;
+    for (const o of obelisks) o.material.emissiveIntensity = 1.6 + night * 2.2;
     crystal.rotation.y += dt * 0.6;
     crystal.position.y = 5.2 + Math.sin(t * 1.3) * 0.35;
     tmpCol.setHSL((t * 0.05) % 1, 0.8, 0.6);
@@ -142,5 +115,5 @@ export function createWorld(scene, renderer, quality) {
     obelisks.forEach((o, i) => { o.position.y = 3.8 + Math.sin(t * 2 + i) * 0.15; o.rotation.y += dt; });
   }
 
-  return { update, sun, sunDir, isFree };
+  return { update, sun, sunDir, isFree, time: dn.state, setHour: dn.setHour, clearHour: dn.clearHour };
 }

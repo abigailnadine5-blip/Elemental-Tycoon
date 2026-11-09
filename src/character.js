@@ -5,15 +5,19 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { faceTexture } from './textures.js';
 import { hex } from './elements.js';
+import { Animator } from './animator.js';
 
 const SKINS = [0xf2cd37, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
 const G = {
   head: new RoundedBoxGeometry(0.66, 0.62, 0.62, 3, 0.1),
-  torso: new RoundedBoxGeometry(1.0, 1.0, 0.5, 2, 0.06),
-  limb: new RoundedBoxGeometry(0.48, 1.0, 0.48, 2, 0.06),
-  sleeve: new RoundedBoxGeometry(0.52, 0.44, 0.52, 2, 0.06),
-  glove: new RoundedBoxGeometry(0.52, 0.26, 0.52, 2, 0.06),
-  boot: new RoundedBoxGeometry(0.54, 0.28, 0.6, 2, 0.06),
+  torso: new RoundedBoxGeometry(1.0, 0.66, 0.5, 2, 0.06),
+  hipsBox: new RoundedBoxGeometry(0.98, 0.36, 0.5, 2, 0.06),
+  upperArm: new RoundedBoxGeometry(0.46, 0.52, 0.46, 2, 0.06),
+  foreArm: new RoundedBoxGeometry(0.44, 0.38, 0.44, 2, 0.06),
+  hand: new RoundedBoxGeometry(0.42, 0.22, 0.42, 2, 0.06),
+  thigh: new RoundedBoxGeometry(0.48, 0.52, 0.48, 2, 0.06),
+  shin: new RoundedBoxGeometry(0.46, 0.38, 0.46, 2, 0.06),
+  shoe: new RoundedBoxGeometry(0.48, 0.14, 0.62, 2, 0.05),
   belt: new THREE.BoxGeometry(1.03, 0.13, 0.53),
 };
 let FACE = null;
@@ -517,7 +521,7 @@ const darkMetal = () => new THREE.MeshStandardMaterial({ color: 0x3a4047, metaln
 
 // Bagian-bagian kostum (kepala, tangan, punggung, dll.)
 function buildCostume(kind, el, P, extras, anims) {
-  const { head, body, armL, armR, legL, legR, F } = P;
+  const { head, upper, lower, handR, elL, shL, shR, knL, knR, F } = P;
   const M = (m) => F || m;
   const cloth = (color, extra = {}) => M(new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra }));
   const glow = M(glowMat(el.glow, 2));
@@ -536,13 +540,13 @@ function buildCostume(kind, el, P, extras, anims) {
       }
       // dua katana menyilang di punggung
       for (const s of [-1, 1]) {
-        const k = new THREE.Group(); k.position.set(0, 1.55, -0.3); k.rotation.z = s * 0.65; body.add(k);
+        const k = new THREE.Group(); k.position.set(0, 1.55, -0.3); k.rotation.z = s * 0.65; upper.add(k);
         mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.35, 8), band, k, 0, 0.72, 0);
         mesh(new THREE.BoxGeometry(0.16, 0.04, 0.1), M(glowMat(0xffd54f, 0.4)), k, 0, 0.53, 0);
         mesh(new THREE.BoxGeometry(0.06, 1.1, 0.03), M(new THREE.MeshStandardMaterial({ color: 0xdfe6ea, metalness: 1, roughness: 0.15, emissive: el.glow, emissiveIntensity: 0.25 })), k, 0, -0.05, 0);
       }
-      for (const l of [legL, legR]) mesh(new THREE.BoxGeometry(0.52, 0.08, 0.52), band, l, 0, -0.6, 0);
-      return { side: 0x17181f, pants: 0x17181f, gloves: el.color, boots: 0x101014, belt: el.color, face: true };
+      for (const l of [knL, knR]) mesh(new THREE.BoxGeometry(0.5, 0.08, 0.5), band, l, 0, -0.12, 0);
+      return { side: 0x17181f, pants: 0x17181f, fore: 0x2a2d3a, gloves: el.color, boots: 0x101014, belt: el.color, face: true, style: 'ninja' };
     }
     case 'kesatria': {
       const metal = M(tintMetal(el));
@@ -551,22 +555,22 @@ function buildCostume(kind, el, P, extras, anims) {
       mesh(new THREE.BoxGeometry(0.56, 0.03, 0.02), glow, head, 0, 0.05, 0.4);
       mesh(new THREE.BoxGeometry(0.08, 0.3, 0.66), cloth(el.color, { emissive: el.color, emissiveIntensity: 0.3 }), head, 0, 0.48, -0.02);
       // pedang di tangan kanan
-      const sw = new THREE.Group(); sw.position.set(0, -0.98, 0.05); armR.add(sw);
+      const sw = new THREE.Group(); sw.position.set(0, -0.08, 0.05); handR.add(sw);
       mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.32, 8), cloth(0x4e342e), sw, 0, 0, 0).rotation.x = Math.PI / 2;
       mesh(new THREE.BoxGeometry(0.42, 0.07, 0.08), M(glowMat(0xffd54f, 0.5, { metalness: 1 })), sw, 0, 0, 0.18);
       mesh(new THREE.BoxGeometry(0.035, 0.14, 1.25), M(new THREE.MeshStandardMaterial({ color: 0xeef3f6, metalness: 1, roughness: 0.12, emissive: el.glow, emissiveIntensity: 0.7 })), sw, 0, 0, 0.84);
       // perisai di tangan kiri
-      const sh = new THREE.Group(); sh.position.set(-0.3, -0.55, 0.05); armL.add(sh);
+      const sh = new THREE.Group(); sh.position.set(0.3, -0.15, 0.05); elL.add(sh);
       mesh(new RoundedBoxGeometry(0.1, 0.9, 0.72, 2, 0.04), cloth(el.color, { metalness: 0.6, roughness: 0.35 }), sh);
       mesh(new THREE.BoxGeometry(0.12, 0.92, 0.1), M(glowMat(0xffd54f, 0.6, { metalness: 1 })), sh);
       mesh(new THREE.BoxGeometry(0.12, 0.1, 0.74), M(glowMat(0xffd54f, 0.6, { metalness: 1 })), sh, 0, 0.12, 0);
       // jubah
-      const pivot = new THREE.Group(); pivot.position.set(0, 2.0, -0.27); body.add(pivot);
+      const pivot = new THREE.Group(); pivot.position.set(0, 2.0, -0.27); upper.add(pivot);
       const geo = new THREE.PlaneGeometry(0.95, 1.6, 1, 6); geo.translate(0, -0.8, 0);
       mesh(geo, F || new THREE.MeshStandardMaterial({ color: el.color, emissive: el.dark, emissiveIntensity: 0.3, side: THREE.DoubleSide, roughness: 0.8 }), pivot);
       extras.push({ type: 'cape', obj: pivot });
-      for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.34, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), metal, body, s * 0.75, 1.92, 0).scale.set(1, 0.7, 1);
-      return { side: 'metal', pants: 'metal', gloves: 'metal', boots: 'metal', belt: 0x5d4037, face: false };
+      for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.34, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), metal, upper, s * 0.75, 1.92, 0).scale.set(1, 0.7, 1);
+      return { side: 'metal', pants: 'metal', fore: 'metal', gloves: 'metal', boots: 'metal', belt: 0x5d4037, face: false, style: 'heavy' };
     }
     case 'penyihir': {
       const robe = cloth(el.dark, { side: THREE.DoubleSide });
@@ -578,15 +582,15 @@ function buildCostume(kind, el, P, extras, anims) {
       const st = mesh(new THREE.OctahedronGeometry(0.08), M(glowMat(0xffd54f, 3)), head, 0, 1.25, -0.2);
       anims.push((t) => { st.rotation.y = t * 3; });
       // jubah panjang
-      mesh(new THREE.CylinderGeometry(0.56, 0.74, 1.05, 18, 1, true), robe, body, 0, 0.52, 0);
+      mesh(new THREE.CylinderGeometry(0.56, 0.74, 1.05, 18, 1, true), robe, lower, 0, 0.52, 0);
       // tongkat sihir
-      const staff = new THREE.Group(); staff.position.set(0, -0.98, 0.16); armR.add(staff);
+      const staff = new THREE.Group(); staff.position.set(0, -0.08, 0.16); handR.add(staff);
       mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.5, 8), cloth(0x6d4c41), staff, 0, 0.3, 0);
       const orb = mesh(new THREE.SphereGeometry(0.15, 16, 12), M(glowMat(el.glow, 3)), staff, 0, 1.62, 0);
       const ring = mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 24), glow, staff, 0, 1.62, 0);
       anims.push((t) => { ring.rotation.x = t * 3; ring.rotation.y = t * 2; orb.scale.setScalar(1 + Math.sin(t * 6) * 0.12); });
       extras.push({ type: 'tip', obj: orb });
-      return { side: el.dark, pants: el.dark, gloves: 0xf1e3c8, boots: 0x3e2723, belt: 0xffb300, face: true };
+      return { side: el.dark, pants: el.dark, fore: el.dark, gloves: 0xf1e3c8, boots: 0x3e2723, belt: 0xffb300, face: true, style: 'mage' };
     }
     case 'samurai': {
       const lac = cloth(0x1d1d22, { roughness: 0.4, metalness: 0.3 });
@@ -602,21 +606,21 @@ function buildCostume(kind, el, P, extras, anims) {
       mesh(new THREE.SphereGeometry(0.07, 10, 8), glow, head, 0, 0.32, 0.36);
       // pelindung bahu & rok baju zirah
       const plate = cloth(el.color, { roughness: 0.4, metalness: 0.3 });
-      for (const [a, s] of [[armL, -1], [armR, 1]]) mesh(new THREE.BoxGeometry(0.12, 0.5, 0.56), plate, a, s * 0.3, -0.18, 0);
+      for (const [a, s] of [[shL, 1], [shR, -1]]) mesh(new THREE.BoxGeometry(0.12, 0.5, 0.56), plate, a, s * 0.3, -0.18, 0);
       for (const [x, z, ry] of [[0, 0.27, 0], [-0.45, 0, Math.PI / 2], [0.45, 0, Math.PI / 2]]) {
-        const p = mesh(new THREE.BoxGeometry(0.5, 0.36, 0.06), plate, body, x, 0.86, z);
+        const p = mesh(new THREE.BoxGeometry(0.5, 0.36, 0.06), plate, lower, x, 0.86, z);
         p.rotation.y = ry; p.rotation.x = z ? 0.15 : 0;
       }
       // katana di pinggang & bendera di punggung
-      const kat = new THREE.Group(); kat.position.set(-0.56, 1.05, 0.05); kat.rotation.x = -1.2; body.add(kat);
+      const kat = new THREE.Group(); kat.position.set(-0.56, 1.05, 0.05); kat.rotation.x = -1.2; lower.add(kat);
       mesh(new THREE.BoxGeometry(0.07, 1.1, 0.07), lac, kat);
       mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.32, 8), cloth(el.color), kat, 0, 0.7, 0);
-      mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.0, 6), cloth(0x3e2723), body, 0, 2.55, -0.33);
-      const flag = new THREE.Group(); flag.position.set(0.02, 3.45, -0.33); body.add(flag);
+      mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.0, 6), cloth(0x3e2723), upper, 0, 2.55, -0.33);
+      const flag = new THREE.Group(); flag.position.set(0.02, 3.45, -0.33); upper.add(flag);
       const fg = new THREE.PlaneGeometry(0.5, 0.95); fg.translate(0.25, -0.47, 0);
       mesh(fg, F || new THREE.MeshStandardMaterial({ map: costumeTexture(el, 'samurai', true), side: THREE.DoubleSide, roughness: 0.9 }), flag).rotation.y = Math.PI / 2;
       extras.push({ type: 'flag', obj: flag });
-      return { side: el.dark, pants: 0x1d1d22, gloves: 0x1d1d22, boots: 0x101014, belt: el.color, face: true };
+      return { side: el.dark, pants: 0x1d1d22, fore: 0x1d1d22, gloves: 0x1d1d22, boots: 0x101014, belt: el.color, face: true, style: 'heavy' };
     }
     case 'mecha': {
       const dm = M(darkMetal());
@@ -629,19 +633,19 @@ function buildCostume(kind, el, P, extras, anims) {
         ant.rotation.z = -s * 0.3;
       }
       for (const s of [-1, 1]) {
-        mesh(new RoundedBoxGeometry(0.5, 0.42, 0.62, 2, 0.06), dm, body, s * 0.8, 2.05, 0);
-        mesh(new THREE.BoxGeometry(0.52, 0.06, 0.64), glow, body, s * 0.8, 2.0, 0);
+        mesh(new RoundedBoxGeometry(0.5, 0.42, 0.62, 2, 0.06), dm, upper, s * 0.8, 2.05, 0);
+        mesh(new THREE.BoxGeometry(0.52, 0.06, 0.64), glow, upper, s * 0.8, 2.0, 0);
       }
-      const core = mesh(new THREE.SphereGeometry(0.1, 14, 10), M(glowMat(el.glow, 3)), body, 0, 1.72, 0.27);
+      const core = mesh(new THREE.SphereGeometry(0.1, 14, 10), M(glowMat(el.glow, 3)), upper, 0, 1.72, 0.27);
       anims.push((t) => { core.scale.setScalar(1 + Math.sin(t * 4) * 0.2); });
       for (const x of [-0.2, 0.2]) {
-        mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.75, 14), dm, body, x, 1.6, -0.42);
-        const noz = mesh(new THREE.ConeGeometry(0.14, 0.22, 12), glow, body, x, 1.12, -0.42);
+        mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.75, 14), dm, upper, x, 1.6, -0.42);
+        const noz = mesh(new THREE.ConeGeometry(0.14, 0.22, 12), glow, upper, x, 1.12, -0.42);
         noz.rotation.x = Math.PI;
-        const marker = new THREE.Object3D(); marker.position.set(x, 1.0, -0.42); body.add(marker);
+        const marker = new THREE.Object3D(); marker.position.set(x, 1.0, -0.42); upper.add(marker);
         extras.push({ type: 'jet', obj: marker });
       }
-      return { side: 'dark', pants: 'dark', gloves: el.glow, glovesGlow: true, boots: 'dark', bootsGlow: el.glow, belt: el.glow, face: false };
+      return { side: 'dark', pants: 'dark', fore: 'dark', gloves: el.glow, glovesGlow: true, boots: 'dark', bootsGlow: el.glow, belt: el.glow, face: false, style: 'robot' };
     }
   }
   return null;
@@ -673,7 +677,14 @@ function makeOrbiters(el, F) {
   return g;
 }
 
+// Gaya gerak (animator) untuk baju standar tiap elemen
+const ELEMENT_GAIT = { gempa: 'heavy', logam: 'heavy', techno: 'robot', angin: 'light', cahaya: 'light', bayangan: 'ninja', api: 'swagger', racun: 'swagger', listrik: 'light' };
+// Aksi animator untuk tiap nama aksi game
+const SKILL_ACTION = { api: 'castPower', air: 'castWave', daun: 'castHarvest', listrik: 'castDash', techno: 'castPower', gempa: 'castSlam', es: 'castPower', angin: 'castSpin', cahaya: 'castPower', bayangan: 'castDash', racun: 'castWave', logam: 'castSlam' };
+const ACTION_MAP = { throw: 'throw', punch: 'punch', cast: 'castWave', slam: 'castSlam', slash: 'slash', transform: 'transform', wave: 'wave', dance: 'dance', salute: 'salute', flex: 'flex', victory: 'cheer', collect: 'collect', fistPump: 'fistPump', shake: 'shake', point: 'point' };
+
 /**
+ * Avatar ber-rig: pinggul -> pinggang -> leher -> kepala, bahu -> siku -> tangan, panggul -> lutut -> pergelangan kaki.
  * opts.material  -> paksa satu material (patung emas)
  * opts.skin      -> warna kulit
  * opts.costume   -> 'standar' | 'ninja' | 'kesatria' | 'penyihir' | 'samurai' | 'mecha'
@@ -684,34 +695,48 @@ export function createAvatar(el, opts = {}) {
   const o = OUTFITS[el.id] || OUTFITS.api;
   const F = opts.material || null;
   const kind = opts.costume && opts.costume !== 'standar' ? opts.costume : null;
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  root.add(body);
   const extras = [], anims = [];
-
   const skin = opts.skin ?? SKINS[Math.floor(Math.random() * SKINS.length)];
   const skinMat = F || new THREE.MeshStandardMaterial({ color: skin, roughness: 0.55 });
 
-  const headPivot = new THREE.Group();
-  headPivot.position.set(0, 2.32, 0);
-  body.add(headPivot);
-  const head = mesh(G.head, skinMat, headPivot);
+  // ---------- rig ----------
+  const root = new THREE.Group();
+  const body = new THREE.Group(); root.add(body);
+  const J = { body };
+  const hips = new THREE.Group(); hips.position.y = 1.0; body.add(hips); J.hips = hips;
+  const waist = new THREE.Group(); waist.position.y = 0.34; hips.add(waist); J.waist = waist;
+  const neck = new THREE.Group(); neck.position.y = 0.66; waist.add(neck); J.neck = neck;
+  const head = new THREE.Group(); head.position.y = 0.33; neck.add(head); J.head = head;
+  // grup bantu: koordinat lama (absolut dari kaki) tetap berlaku untuk aksesori
+  const upper = new THREE.Group(); upper.position.y = -1.34; waist.add(upper);
+  const lower = new THREE.Group(); lower.position.y = -1.0; hips.add(lower);
 
-  const limb = (x, y, mat) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, y, 0);
-    body.add(pivot);
-    const m = mesh(G.limb, mat, pivot, 0, -0.5, 0);
-    return [pivot, m];
+  const headMesh = mesh(G.head, skinMat, head);
+  const arm = (s) => {
+    const sh = new THREE.Group(); sh.position.set(s * 0.75, 0.6, 0); waist.add(sh);
+    const up = mesh(G.upperArm, skinMat, sh, 0, -0.24, 0);
+    const elb = new THREE.Group(); elb.position.y = -0.5; sh.add(elb);
+    const fore = mesh(G.foreArm, skinMat, elb, 0, -0.17, 0);
+    const hand = new THREE.Group(); hand.position.y = -0.42; elb.add(hand);
+    const handM = mesh(G.hand, skinMat, hand, 0, -0.03, 0);
+    return { sh, elb, hand, up, fore, handM };
   };
-  const [armL] = limb(-0.75, 1.98, skinMat);
-  const [armR] = limb(0.75, 1.98, skinMat);
-  const [legL, legLm] = limb(-0.25, 1.0, skinMat);
-  const [legR, legRm] = limb(0.25, 1.0, skinMat);
+  const leg = (s) => {
+    const hp = new THREE.Group(); hp.position.set(s * 0.25, 0, 0); hips.add(hp);
+    const thigh = mesh(G.thigh, skinMat, hp, 0, -0.25, 0);
+    const kn = new THREE.Group(); kn.position.y = -0.5; hp.add(kn);
+    const shin = mesh(G.shin, skinMat, kn, 0, -0.17, 0);
+    const an = new THREE.Group(); an.position.y = -0.38; kn.add(an);
+    const shoe = mesh(G.shoe, skinMat, an, 0, -0.05, 0.06);
+    return { hp, kn, an, thigh, shin, shoe };
+  };
+  // L = sisi kiri karakter (+X, karena karakter menghadap +Z)
+  const aL = arm(1), aR = arm(-1), lL = leg(1), lR = leg(-1);
+  Object.assign(J, { shL: aL.sh, elL: aL.elb, shR: aR.sh, elR: aR.elb, hpL: lL.hp, knL: lL.kn, anL: lL.an, hpR: lR.hp, knR: lR.kn, anR: lR.an });
 
-  // --- tentukan bahan baju ---
-  let spec;
-  if (kind) spec = buildCostume(kind, el, { head: headPivot, body, armL, armR, legL, legR, F }, extras, anims);
+  // ---------- baju / kostum ----------
+  let spec = null;
+  if (kind) spec = buildCostume(kind, el, { head, upper, lower, handR: aR.hand, elL: aL.elb, shL: aL.sh, shR: aR.sh, knL: lL.kn, knR: lR.kn, F }, extras, anims);
   const metalMat = kind === 'kesatria' ? tintMetal(el) : null;
   const pick = (v, rough = 0.75) => {
     if (F) return F;
@@ -719,10 +744,11 @@ export function createAvatar(el, opts = {}) {
     if (v === 'dark') return darkMetal();
     return new THREE.MeshStandardMaterial({ color: v, roughness: rough });
   };
-  let sideMat, pantsMat, glove, boot, beltMat, showFace = true;
+  let sideMat, pantsMat, foreMat, glove, boot, beltMat, showFace = true;
   if (spec) {
     sideMat = pick(spec.side);
     pantsMat = pick(spec.pants, 0.8);
+    foreMat = pick(spec.fore);
     glove = F || (spec.gloves === 'metal' ? metalMat : new THREE.MeshStandardMaterial({ color: spec.gloves, roughness: 0.6, emissive: spec.glovesGlow ? spec.gloves : 0, emissiveIntensity: spec.glovesGlow ? 1.3 : 0 }));
     boot = F || (spec.boots === 'metal' ? metalMat : spec.boots === 'dark' ? darkMetal() : new THREE.MeshStandardMaterial({ color: spec.boots, roughness: 0.5 }));
     if (spec.bootsGlow && !F) { boot = darkMetal(); boot.emissive = new THREE.Color(spec.bootsGlow); boot.emissiveIntensity = 0.5; }
@@ -731,42 +757,39 @@ export function createAvatar(el, opts = {}) {
   } else {
     sideMat = F || new THREE.MeshStandardMaterial({ color: o.side, roughness: o.metal ? 0.3 : 0.7, metalness: o.metal ? 0.9 : 0 });
     pantsMat = F || new THREE.MeshStandardMaterial({ color: o.pants, roughness: 0.8 });
+    foreMat = skinMat;
     glove = F || new THREE.MeshStandardMaterial({ color: o.gloves, roughness: 0.6, emissive: o.glovesGlow ? o.gloves : 0, emissiveIntensity: o.glovesGlow ? 1.2 : 0 });
     boot = F || new THREE.MeshStandardMaterial({ color: o.boots, roughness: 0.5, emissive: o.bootsGlow ? o.boots : 0, emissiveIntensity: o.bootsGlow ? 0.9 : 0 });
     beltMat = F || new THREE.MeshStandardMaterial({ color: o.belt, roughness: 0.4, metalness: 0.4, emissive: o.belt, emissiveIntensity: 0.25 });
   }
-  legLm.material = pantsMat; legRm.material = pantsMat;
+  for (const a of [aL, aR]) { a.up.material = sideMat; a.fore.material = foreMat; a.handM.material = glove; }
+  for (const l of [lL, lR]) { l.thigh.material = pantsMat; l.shin.material = pantsMat; l.shoe.material = boot; }
 
-  // badan + motif
-  const torso = mesh(G.torso, sideMat, body, 0, 1.5, 0);
+  // pinggul + badan dengan motif
+  mesh(G.hipsBox, pantsMat, hips, 0, 0.17, 0);
+  const torso = mesh(G.torso, sideMat, waist, 0, 0.33, 0);
   if (!F) {
     const metalish = kind === 'kesatria' || kind === 'mecha' || (!kind && o.metal);
     const pm = { roughness: metalish ? 0.3 : 0.7, metalness: metalish ? 0.8 : 0 };
     const tex = (front) => (kind ? costumeTexture(el, kind, front) : shirtTexture(el, o, front));
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: tex(true), ...pm }));
-    front.position.set(0, 0, 0.252);
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: tex(false), ...pm }));
-    back.position.set(0, 0, -0.252); back.rotation.y = Math.PI;
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshStandardMaterial({ map: tex(true), ...pm }));
+    front.position.set(0, 0.01, 0.252);
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshStandardMaterial({ map: tex(false), ...pm }));
+    back.position.set(0, 0.01, -0.252); back.rotation.y = Math.PI;
     torso.add(front, back);
   }
-  mesh(G.belt, beltMat, body, 0, 1.06, 0);
-  mesh(new THREE.BoxGeometry(0.2, 0.15, 0.04), F || glowMat(el.glow, 1.2), body, 0, 1.06, 0.28);
+  mesh(G.belt, beltMat, hips, 0, 0.3, 0);
+  mesh(new THREE.BoxGeometry(0.2, 0.15, 0.04), F || glowMat(el.glow, 1.2), hips, 0, 0.3, 0.28);
 
   if (!F && showFace) {
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshStandardMaterial({ map: FACE, transparent: true, roughness: 0.6 }));
     face.position.z = 0.312;
-    head.add(face);
+    headMesh.add(face);
   }
-  if (!kind && !opts.noAccessory) addHeadAccessory(el, headPivot, F, anims);
+  if (!kind && !opts.noAccessory) addHeadAccessory(el, head, F, anims);
+  if (!kind) addBack(o, el, upper, extras, F);
 
-  for (const a of [armL, armR]) {
-    mesh(G.sleeve, sideMat, a, 0, -0.2, 0);
-    mesh(G.glove, glove, a, 0, -0.88, 0);
-  }
-  for (const l of [legL, legR]) mesh(G.boot, boot, l, 0, -0.87, 0.04);
-  if (!kind) addBack(o, el, body, extras, F);
-
-  // aura & orbit ultimate
+  // ---------- aura & orbit ultimate ----------
   const auraMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(el.glow).multiplyScalar(2), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false });
   const aura = new THREE.Group();
   for (const [r, y] of [[1.1, 0.15], [0.85, 1.4], [0.7, 2.6]]) {
@@ -780,80 +803,37 @@ export function createAvatar(el, opts = {}) {
   let orbit = null;
 
   // ---------- animasi ----------
-  let phase = 0, t = 0, power = false, scale = 1, act = null;
-  const cur = { aL: 0, aR: 0, zL: 0, zR: 0, lL: 0, lR: 0, pitch: 0, yaw: 0, lift: 0, head: 0 };
-  const style = (kind && COSTUME_STYLE[kind]) || ELEMENT_STYLE[el.id] || 'throw';
+  const gait = spec ? spec.style : ELEMENT_GAIT[el.id] || 'normal';
+  const anim = new Animator(J, gait);
+  const attackStyle = (kind && COSTUME_STYLE[kind]) || ELEMENT_STYLE[el.id] || 'throw';
+  let t = 0, power = false, scale = 1;
 
-  function update(dt, speed, airborne, flying = false) {
+  // update(dt, inp) dengan inp = { speed (unit/detik), grounded, vy, turn, accel, fly }
+  // (bentuk lama update(dt, speedNorm, airborne, flying) juga masih didukung)
+  function update(dt, a, b, c) {
+    const inp = typeof a === 'object' && a !== null ? a : { speed: (a || 0) * 7.5, grounded: !b, vy: 0, fly: !!c };
     t += dt;
-    const s = Math.min(speed, 1.6);
-    phase += dt * (4 + 7 * s);
-    const T = { aL: 0, aR: 0, zL: -0.04, zR: 0.04, lL: 0, lR: 0, pitch: 0, yaw: 0, lift: 0, head: 0 };
-    if (flying) {
-      Object.assign(T, { aL: -2.95, aR: -2.95, zL: 0.12, zR: -0.12, lL: 0.25, lR: 0.1, pitch: 1.15, head: -0.6 });
-    } else if (airborne) {
-      Object.assign(T, { aL: -2.7, aR: -2.7, zL: -0.25, zR: 0.25, lL: 0.25, lR: -0.25 });
-    } else if (s > 0.05) {
-      const sw = Math.sin(phase) * 0.9 * Math.min(1, s);
-      Object.assign(T, { aL: sw, aR: -sw, lL: -sw, lR: sw, pitch: s * 0.08, lift: Math.abs(Math.sin(phase)) * 0.07 * Math.min(1, s) });
-    } else {
-      // idle: bernapas & sedikit goyang
-      T.zL = -0.05 - Math.sin(t * 1.6) * 0.03; T.zR = 0.05 + Math.sin(t * 1.6) * 0.03;
-      T.lift = Math.sin(t * 1.6) * 0.012;
-      T.head = Math.sin(t * 0.7) * 0.05;
-    }
-    if (act && act.emote && (s > 0.2 || airborne)) act = null;
-    if (act) {
-      act.t += dt;
-      const p = act.t / act.dur;
-      if (p >= 1) act = null;
-      else switch (act.name) {
-        case 'throw': Object.assign(T, p < 0.35 ? { aR: -2.9, zR: 0.3, yaw: -0.45 } : { aR: -1.2, zR: 0, yaw: 0.35, aL: -0.4 }); break;
-        case 'punch': Object.assign(T, { aR: -1.6, yaw: 0.35, aL: 0.4, pitch: 0.12 }); break;
-        case 'cast': Object.assign(T, { aL: -1.55, aR: -1.55, zL: 0.18, zR: -0.18, pitch: 0.05 }); break;
-        case 'slam': Object.assign(T, p < 0.45 ? { aL: -3.0, aR: -3.0, lift: Math.sin((p / 0.45) * Math.PI / 2) * 0.4, head: -0.3 } : { aL: -0.7, aR: -0.7, pitch: 0.35, zL: 0.15, zR: -0.15 }); break;
-        case 'slash': Object.assign(T, p < 0.3 ? { aR: -2.9, zR: 0.6, yaw: -0.5 } : { aR: -0.75, zR: -0.5, yaw: 0.55, pitch: 0.15, aL: 0.3 }); break;
-        case 'skill': Object.assign(T, { aL: -2.9, aR: -2.9, zL: -0.5, zR: 0.5, lift: Math.sin(p * Math.PI) * 0.3, head: -0.35 }); break;
-        case 'transform': Object.assign(T, { yaw: p * Math.PI * 4, zL: -1.4, zR: 1.4, aL: 0, aR: 0, lift: Math.sin(p * Math.PI) * 0.9, head: -0.3 }); break;
-        case 'wave': Object.assign(T, { aR: 0, zR: 2.5 + Math.sin(t * 14) * 0.35, head: Math.sin(t * 3) * 0.1 }); break;
-        case 'dance': {
-          const b = t * 8;
-          Object.assign(T, { aL: Math.sin(b) > 0 ? -2.8 : -0.2, aR: Math.sin(b) > 0 ? -0.2 : -2.8, zL: -0.35, zR: 0.35, yaw: Math.sin(t * 4) * 0.45, lift: Math.abs(Math.sin(b)) * 0.18, lL: Math.sin(b) * 0.5, lR: -Math.sin(b) * 0.5 });
-          break;
-        }
-        case 'salute': Object.assign(T, { aR: -2.6, zR: -0.65, head: -0.05 }); break;
-        case 'flex': Object.assign(T, { zL: -1.5 - Math.sin(t * 10) * 0.18, zR: 1.5 + Math.sin(t * 10) * 0.18, aL: -0.2, aR: -0.2, head: Math.sin(t * 5) * 0.1, pitch: -0.05 }); break;
-        case 'victory': Object.assign(T, { aL: -2.9, aR: -2.9, zL: -0.35, zR: 0.35, lift: Math.abs(Math.sin(t * 7)) * 0.55, lL: 0.2, lR: -0.2 }); break;
-      }
-    }
-    const k = 1 - Math.exp(-(act && !act.emote ? 26 : 16) * dt);
-    for (const key in cur) cur[key] += (T[key] - cur[key]) * (key === 'yaw' && act && act.name === 'transform' ? 1 : k);
-    armL.rotation.x = cur.aL; armR.rotation.x = cur.aR;
-    armL.rotation.z = cur.zL; armR.rotation.z = cur.zR;
-    legL.rotation.x = cur.lL; legR.rotation.x = cur.lR;
-    headPivot.rotation.x = cur.head;
-    // putar badan di sekitar pinggul (y = 1.2)
-    body.rotation.set(cur.pitch, cur.yaw, 0);
-    body.position.set(0, 1.2 - 1.2 * Math.cos(cur.pitch) + cur.lift, -1.2 * Math.sin(cur.pitch));
-
+    anim.update(dt, inp);
+    const s = Math.min(1.6, (inp.speed || 0) / 7.5);
+    const airborne = inp.grounded === false;
+    const k = 1 - Math.exp(-16 * dt);
     for (const e of extras) {
       if (e.type === 'cape') {
-        const target = 0.12 + s * 0.55 + (airborne ? 0.5 : 0) + (flying ? 0.6 : 0) + Math.sin(t * 6) * 0.05 * (0.3 + s);
+        const target = 0.12 + s * 0.55 + (airborne ? 0.5 : 0) + (inp.fly ? 0.6 : 0) + Math.sin(t * 6) * 0.05 * (0.3 + s);
         e.obj.rotation.x += (target - e.obj.rotation.x) * k * 0.5;
       } else if (e.type === 'tail') {
         e.obj.rotation.x = 0.5 + s * 0.6 + Math.sin(t * 8 + e.side) * 0.15;
         e.obj.rotation.z = e.side * 0.15;
       } else if (e.type === 'flag') {
-        e.obj.rotation.y = Math.sin(t * 3) * 0.25;
+        e.obj.rotation.y = Math.sin(t * 3) * 0.25 + s * 0.2;
       } else if (e.type === 'wing') {
         const flap = airborne || power ? Math.sin(t * 12) * 0.55 : Math.sin(t * 2) * 0.12;
         e.obj.rotation.y = e.side * (0.55 + flap);
         e.obj.rotation.z = e.side * -0.1;
       }
     }
-    for (const a of anims) a(t);
+    for (const fn of anims) fn(t);
 
-    // ultimate: membesar + aura + benda mengorbit
     const ts = power ? 1.25 : 1;
     scale += (ts - scale) * Math.min(1, dt * 6);
     root.scale.setScalar(scale * (opts.baseScale || 1));
@@ -865,9 +845,9 @@ export function createAvatar(el, opts = {}) {
     if (orbit) {
       orbit.visible = power;
       orbit.children.forEach((m, i) => {
-        const a = t * 2.6 + (i / orbit.children.length) * Math.PI * 2;
+        const ang = t * 2.6 + (i / orbit.children.length) * Math.PI * 2;
         const r = 1.35 + Math.sin(t * 2 + i) * 0.15;
-        m.position.set(Math.cos(a) * r, 1.3 + Math.sin(t * 3 + i * 1.3) * 0.7, Math.sin(a) * r);
+        m.position.set(Math.cos(ang) * r, 1.3 + Math.sin(t * 3 + i * 1.3) * 0.7, Math.sin(ang) * r);
         m.rotation.x += dt * 3; m.rotation.y += dt * 4;
       });
     }
@@ -877,10 +857,13 @@ export function createAvatar(el, opts = {}) {
   aura.traverse((m) => { m.castShadow = false; });
 
   return {
-    root, update, element: el, costume: kind || 'standar',
-    play(name, dur) { act = { name, t: 0, dur: dur || ACTION_DUR[name] || 1, emote: EMOTES.some((e) => e.id === name) }; },
-    attack() { this.play(style); },
-    punch() { this.play(style); },
+    root, update, anim, element: el, costume: kind || 'standar',
+    play(name) {
+      const a = name === 'skill' ? SKILL_ACTION[el.id] || 'castPower' : ACTION_MAP[name] || name;
+      anim.play(a);
+    },
+    attack() { this.play(attackStyle); },
+    punch() { this.play(attackStyle); },
     setPower(on) { power = on; },
     jets() { return extras.filter((e) => e.type === 'jet').map((e) => e.obj); },
     tip() { const e = extras.find((x) => x.type === 'tip'); return e ? e.obj : null; },

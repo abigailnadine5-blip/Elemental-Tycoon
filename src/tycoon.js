@@ -99,6 +99,12 @@ const M = {
   water: new THREE.MeshPhysicalMaterial({ color: 0x29b6f6, roughness: 0.03, clearcoat: 1, transparent: true, opacity: 0.82, emissive: 0x0277bd, emissiveIntensity: 0.25 }),
   poolTile: new THREE.MeshStandardMaterial({ color: 0x9fe3ff, roughness: 0.4 }),
 };
+// Lampu markas lebih terang saat malam
+export function setNightLevel(n) {
+  M.bulb.emissiveIntensity = 1 + n * 3.5;
+  M.panel.emissiveIntensity = 1.2 + n * 2.2;
+}
+
 const ORE_GEO = new RoundedBoxGeometry(0.55, 0.55, 0.55, 2, 0.08);
 const PAD_GEO = new THREE.CylinderGeometry(1.25, 1.25, 0.18, 32);
 const UPG_COLORS = { 1.5: 0x00e676, 2: 0x2979ff, 3: 0xd500f9 };

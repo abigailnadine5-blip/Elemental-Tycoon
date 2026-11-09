@@ -8,9 +8,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ELEMENTS, getElement, passive, hex } from './elements.js';
 import { createWorld, PLOT_POSITIONS, WORLD_LIMIT } from './world.js';
-import { Plot, START_CASH, BELT_SPEED, validItems } from './tycoon.js';
+import { Plot, START_CASH, BELT_SPEED, validItems, setNightLevel } from './tycoon.js';
+import { hourLabel } from './daynight.js';
 import { createAvatar, disposeAvatar, COSTUMES, costumeName, EMOTES } from './character.js';
 import { ElementFX } from './elementfx.js';
+import { Villagers } from './npcs.js';
 import { Particles, Effects } from './particles.js';
 import { Powers, Crystals } from './powers.js';
 import { makeLabel } from './textures.js';
@@ -68,6 +70,10 @@ const effects = new Effects(scene);
 const plots = PLOT_POSITIONS.map((p, i) => new Plot(scene, i, p, particles));
 const powers = new Powers(scene, particles, effects);
 const elFx = new ElementFX(scene, particles, effects);
+const villagers = new Villagers(scene, low ? 5 : 8, {
+  onEmote: (v, id) => elFx.emote(v.el, v.pos, id),
+  onStep: (v, run) => { if (run > 0.4) particles.emit(new THREE.Vector3(v.pos.x, 0.15, v.pos.z), 2, { color: 0xb8a888, speed: 1, up: 0.6, gravity: 3, life: 0.4, size: 0.3, additive: false }); },
+});
 const crystals = new Crystals(scene, particles, world.isFree, ELEMENTS.map((e) => e.color));
 const input = new Input(canvas);
 
@@ -438,6 +444,9 @@ function buildPlayerAvatar() {
   player.avatar.root.add(player.label.sprite);
   player.avatar.root.position.copy(player.pos);
   scene.add(player.avatar.root);
+  player.avatar.anim.onStep = (side, run) => {
+    if (run > 0.3 && player.onGround) particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.1, player.pos.z), 3, { color: 0xb8a888, color2: 0xe0d6c0, speed: 1.2, up: 0.8, gravity: 3, life: 0.5, size: 0.35, additive: false });
+  };
 }
 
 function buildHudPanels() {
@@ -505,6 +514,7 @@ function buy(it) {
     toast(it.type === 'floor' ? `🏢 ${it.name} dibangun! Naik tangga di samping ↗` : `✅ ${it.name} dibangun!`, '#7dff9b');
   }
   sfx.buy();
+  player.avatar.play('fistPump');
   syncPlot();
   save();
   return true;
@@ -517,6 +527,7 @@ function collectBank() {
   game.cash += v;
   p.bank = 0;
   sfx.coin();
+  player.avatar.play('collect');
   const pos = player.pos.clone().setY(player.pos.y + 1.5);
   particles.emit(pos, Math.min(80, 15 + Math.log10(v + 1) * 10), { color: 0xffd54f, color2: 0x7dff9b, speed: 5, up: 4, gravity: 9, life: 1.1, size: 0.35 });
   toast(`+${fmt(v)}`, '#7dff9b');
@@ -780,7 +791,11 @@ function updatePlayer(dt) {
   av.root.position.copy(player.pos);
   av.root.rotation.y = player.facing;
   av.setPower(ult);
-  av.update(dt, player.speed, !player.onGround, ult && !player.onGround && (flying || player.vel.y > -3));
+  const turn = (((player.facing - (player.prevFacing ?? player.facing)) + Math.PI * 3) % (Math.PI * 2) - Math.PI) / Math.max(dt, 1e-4);
+  player.prevFacing = player.facing;
+  const accel = (hs - (player.prevHs ?? hs)) / Math.max(dt, 1e-4);
+  player.prevHs = hs;
+  av.update(dt, { speed: hs, grounded: player.onGround, vy: player.vel.y, turn, accel, fly: ult && !player.onGround && (flying || player.vel.y > -3) });
   const tip = av.tip();
   if (tip && Math.random() < dt * 12) { tip.getWorldPosition(tmpW); particles.emit(tmpW, 1, { ...el.fx, speed: 0.6, size: (el.fx.size || 0.4) * 0.6, life: 0.6 }); }
 
@@ -798,7 +813,7 @@ function updatePlayer(dt) {
   if (it) {
     const first = it.id !== game.lastPad;
     game.lastPad = it.id;
-    if (!buy(it) && first) { toast(`Butuh ${fmt(priceOf(it))} untuk ${it.name}`, '#ff8a80'); sfx.error(); }
+    if (!buy(it) && first) { toast(`Butuh ${fmt(priceOf(it))} untuk ${it.name}`, '#ff8a80'); sfx.error(); player.avatar.play('shake'); }
   } else game.lastPad = null;
   if (plot.onCollectPad(tmpL)) collectBank();
   if (plot.has('autocollect') && plot.bank >= 1) { game.cash += plot.bank; plot.bank = 0; }
@@ -868,7 +883,7 @@ function updateRemotes(dt) {
     root.position.z = damp(root.position.z, r.target.z, 12, dt);
     if (root.position.distanceToSquared(r.target) > 400) root.position.copy(r.target);
     root.rotation.y = lerpAngle(root.rotation.y, r.ry, 1 - Math.exp(-12 * dt));
-    r.avatar.update(dt, r.s, r.g, r.g && !!r.u);
+    r.avatar.update(dt, { speed: r.s * 7.5, grounded: !r.g, vy: 0, fly: r.g && !!r.u });
     (r.center || (r.center = new THREE.Vector3())).copy(root.position).y += 1.3;
     if (Math.random() < dt * (r.u ? 40 : 10)) particles.emit(tmpW.set(root.position.x, root.position.y + 1.2 + Math.random(), root.position.z), 1, { ...r.el.fx, spread: 0.6, speed: (r.el.fx.speed || 1) * 0.4, size: (r.el.fx.size || 0.4) * 0.7 });
   }
@@ -927,6 +942,7 @@ function updateHud(dt) {
 // Loop utama
 // ---------------------------------------------------------------------
 const clock = new THREE.Clock();
+let clockTimer = 0;
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -950,11 +966,15 @@ function loop() {
     }
   }
   updateRemotes(dt);
+  villagers.update(dt, game.state === 'playing' ? player.pos : camLook);
   powers.update(dt, powerWorld);
   elFx.update(dt);
   crystals.update(dt, game.state === 'playing' ? player.pos : null);
   updateCamera(dt);
-  world.update(dt, game.t, game.state === 'playing' ? player.pos : camLook);
+  world.update(dt, game.t, game.state === 'playing' ? player.pos : camLook, camera.position);
+  setNightLevel(world.time.night);
+  clockTimer -= dt;
+  if (clockTimer <= 0) { clockTimer = 1; $('clock').textContent = hourLabel(world.time.hour); }
   particles.update(dt);
   effects.update(dt);
   if (game.state === 'playing') { updateHud(dt); sendState(); }
@@ -970,3 +990,4 @@ window.game = game;
 game.player = player;
 game._handlers = handlers; // untuk debug/tes multiplayer
 game._scene = scene;
+game.setHour = (h) => (h == null ? world.clearHour() : world.setHour(h)); // contoh: game.setHour(20)

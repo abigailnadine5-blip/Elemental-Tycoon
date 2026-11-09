@@ -185,7 +185,7 @@ function bushGeo() {
 
 // ---------- angin: shader goyang ----------
 export const windUniform = { value: 0 };
-function addWind(mat, strength) {
+export function addWind(mat, strength, base = 1.0) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = windUniform;
     sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -195,13 +195,13 @@ function addWind(mat, strength) {
         #else
           vec4 wp = modelMatrix * vec4(position, 1.0);
         #endif
-        float hh = max(position.y - 1.0, 0.0);
+        float hh = max(position.y - ${base.toFixed(2)}, 0.0);
         float s = ${strength.toFixed(3)} * hh;
         transformed.x += (sin(uTime * 1.7 + wp.x * 0.13 + wp.z * 0.07) + 0.35 * sin(uTime * 4.3 + wp.z * 0.5)) * s;
         transformed.z += (cos(uTime * 1.3 + wp.z * 0.11 + wp.x * 0.05)) * s * 0.7;
       }`);
   };
-  mat.customProgramCacheKey = () => 'wind' + strength;
+  mat.customProgramCacheKey = () => 'wind' + strength + '_' + base;
 }
 
 // ---------- bangun semua ----------
