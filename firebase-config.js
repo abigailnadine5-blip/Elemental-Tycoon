@@ -11,13 +11,13 @@
 // =====================================================================
 
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  databaseURL: '', // contoh: https://nama-project-default-rtdb.asia-southeast1.firebasedatabase.app
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyDFR1fW4_VnYAMWSaRbbrgLaflaq-mK5Yc',
+  authDomain: 'elemental-tycoon-68344.firebaseapp.com',
+  databaseURL: 'https://elemental-tycoon-68344-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'elemental-tycoon-68344',
+  storageBucket: 'elemental-tycoon-68344.firebasestorage.app',
+  messagingSenderId: '839757969988',
+  appId: '1:839757969988:web:16e499875a66c2916c5a11',
 };
 
 // Nama room default. Bisa diganti lewat URL: index.html?room=namaroom

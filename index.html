@@ -10,7 +10,7 @@
   <script>
     // Auto-update: kalau ada versi baru di server, muat ulang halaman tanpa cache lama.
     // Saat update game, naikkan GAME_VERSION di sini, angka ?v= di bawah, dan isi version.json.
-    window.GAME_VERSION = '8';
+    window.GAME_VERSION = '9';
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((j) => {
@@ -24,33 +24,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-        "./src/ambient.js": "./src/ambient.js?v=8",
-        "./src/animator.js": "./src/animator.js?v=8",
-        "./src/audio.js": "./src/audio.js?v=8",
-        "./src/character.js": "./src/character.js?v=8",
-        "./src/daynight.js": "./src/daynight.js?v=8",
-        "./src/elementfx.js": "./src/elementfx.js?v=8",
-        "./src/elements.js": "./src/elements.js?v=8",
-        "./src/input.js": "./src/input.js?v=8",
-        "./src/multiplayer.js": "./src/multiplayer.js?v=8",
-        "./src/nature.js": "./src/nature.js?v=8",
-        "./src/noise.js": "./src/noise.js?v=8",
-        "./src/npcs.js": "./src/npcs.js?v=8",
-        "./src/particles.js": "./src/particles.js?v=8",
-        "./src/powers.js": "./src/powers.js?v=8",
-        "./src/river.js": "./src/river.js?v=8",
-        "./src/riverpath.js": "./src/riverpath.js?v=8",
-        "./src/textures.js": "./src/textures.js?v=8",
-        "./src/tycoon.js": "./src/tycoon.js?v=8",
-        "./src/util.js": "./src/util.js?v=8",
-        "./src/world.js": "./src/world.js?v=8",
-        "./firebase-config.js": "./firebase-config.js?v=8"
+        "./src/ambient.js": "./src/ambient.js?v=9",
+        "./src/animator.js": "./src/animator.js?v=9",
+        "./src/audio.js": "./src/audio.js?v=9",
+        "./src/character.js": "./src/character.js?v=9",
+        "./src/daynight.js": "./src/daynight.js?v=9",
+        "./src/elementfx.js": "./src/elementfx.js?v=9",
+        "./src/elements.js": "./src/elements.js?v=9",
+        "./src/input.js": "./src/input.js?v=9",
+        "./src/multiplayer.js": "./src/multiplayer.js?v=9",
+        "./src/nature.js": "./src/nature.js?v=9",
+        "./src/noise.js": "./src/noise.js?v=9",
+        "./src/npcs.js": "./src/npcs.js?v=9",
+        "./src/particles.js": "./src/particles.js?v=9",
+        "./src/powers.js": "./src/powers.js?v=9",
+        "./src/river.js": "./src/river.js?v=9",
+        "./src/riverpath.js": "./src/riverpath.js?v=9",
+        "./src/textures.js": "./src/textures.js?v=9",
+        "./src/tycoon.js": "./src/tycoon.js?v=9",
+        "./src/util.js": "./src/util.js?v=9",
+        "./src/world.js": "./src/world.js?v=9",
+        "./firebase-config.js": "./firebase-config.js?v=9"
       }
     }
   </script>
@@ -80,7 +80,7 @@
           lalu injak <b style="color:#ffd54f">pad uang</b> untuk mengambil uangmu.</p>
       </div>
       <div id="netInfo" class="net-info"></div>
-      <div class="version">Versi 4.2 (v8) · 🏊 Bisa berenang di sungai &amp; danau · 🌲 Hutan · 🌅 Siang &amp; 🌙 Malam</div>
+      <div class="version">Versi 4.3 (v9) · 🌐 Multiplayer Firebase · 🏊 Berenang · 🌲 Hutan · 🌅 Siang &amp; 🌙 Malam</div>
     </div>
   </section>
 
@@ -143,6 +143,6 @@
   <div id="loading" class="loading"><div class="spinner"></div><p id="loadingText">Memuat dunia...</p></div>
   <noscript>Game ini butuh JavaScript.</noscript>
 
-  <script type="module" src="src/main.js?v=8"></script>
+  <script type="module" src="src/main.js?v=9"></script>
 </body>
 </html>

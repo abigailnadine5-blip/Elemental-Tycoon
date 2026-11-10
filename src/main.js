@@ -391,6 +391,7 @@ async function startGame(el) {
   if (preview) { disposeAvatar(preview); preview = null; }
 
   mp = await createMultiplayer(handlers);
+  if (!mp.online && firebaseConfigured()) setTimeout(() => toast('⚠️ Multiplayer gagal: ' + mp.reason, '#ffcc80'), 2500);
   const s = loadSave(el.id);
   game.cash = s ? s.cash : START_CASH;
   game.rebirths = s ? s.rebirths || 0 : 0;
