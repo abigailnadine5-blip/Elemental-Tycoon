@@ -123,7 +123,7 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 
 .powerbar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
 .power {
-  position: relative; width: 168px; height: 62px; border-radius: 16px; overflow: hidden; cursor: pointer; color: #fff;
+  position: relative; width: 142px; height: 60px; border-radius: 16px; overflow: hidden; cursor: pointer; color: #fff;
   border: 2px solid color-mix(in srgb, var(--c) 70%, white 30%);
   background: linear-gradient(180deg, color-mix(in srgb, var(--c) 70%, #000 30%), color-mix(in srgb, var(--c) 30%, #000 70%));
   display: flex; align-items: center; gap: 8px; padding: 0 10px; font-family: 'Nunito', sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.4);
@@ -232,3 +232,12 @@ body.touch .chat { bottom: 90px; }
 .lb-row i { font-style: normal; color: #ff8a80; font-weight: 900; margin-left: auto; margin-right: 8px; font-size: 12px; }
 body.touch .hp-wrap { bottom: auto; top: 175px; width: 160px; }
 @media (max-width: 760px) { .hp-wrap { bottom: 250px; width: 180px; } }
+
+.powerbar { gap: 8px; }
+.p-name { font-size: 13.5px; }
+.boosts span.bad { background: rgba(255,82,82,.22); border-color: rgba(255,82,82,.6); color: #ffd0d0; }
+@media (max-width: 900px) { body:not(.touch) .power { width: 116px; } body:not(.touch) .p-name { font-size: 12px; } }
+body.touch .powerbar { grid-template-columns: auto auto auto; }
+body.touch .power { width: 64px; height: 64px; }
+body.touch #btnAttack { width: 88px; height: 88px; }
+body.touch .touch-btn.jump { right: 250px; }

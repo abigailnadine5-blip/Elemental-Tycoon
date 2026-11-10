@@ -14,6 +14,7 @@ import { groundAt, WATER_Y } from './riverpath.js';
 import { createAvatar, disposeAvatar, COSTUMES, costumeName, EMOTES } from './character.js';
 import { ElementFX } from './elementfx.js';
 import { Villagers } from './npcs.js';
+import { SkillSystem, SKILLS, skillOf } from './skills.js';
 import { Particles, Effects } from './particles.js';
 import { Powers, Crystals } from './powers.js';
 import { makeLabel } from './textures.js';
@@ -71,6 +72,20 @@ const effects = new Effects(scene);
 const plots = PLOT_POSITIONS.map((p, i) => new Plot(scene, i, p, particles));
 const powers = new Powers(scene, particles, effects);
 const elFx = new ElementFX(scene, particles, effects);
+const skillSys = new SkillSystem(scene, particles, effects, elFx, {
+  selfPos: () => player.pos,
+  selfAlive: () => game.state === 'playing' && !game.dead,
+  localId: () => mp.id,
+  damageSelf: (amount, owner, dir, status) => applyDamage(amount, owner, dir, status || {}),
+  predict: (e, amount, status) => { const r = remotes.get(e.id); if (r) predictDamage(r, amount, status); },
+  enemies: (owner) => {
+    const out = [];
+    for (const r of remotes.values()) if (!r.dead && r.id !== owner.id && r.avatar.root.visible !== null) out.push({ id: r.id, pos: r.avatar.root.position });
+    return out;
+  },
+  anchor: (id) => (id === mp.id ? player.avatar?.root : remotes.get(id)?.avatar.root) || null,
+  shake: (v) => { game.shake = Math.max(game.shake, v); },
+});
 const villagers = new Villagers(scene, low ? 5 : 8, {
   onEmote: (v, id) => elFx.emote(v.el, v.pos, id),
   onStep: (v, run) => { if (run > 0.4) particles.emit(new THREE.Vector3(v.pos.x, 0.15, v.pos.z), 2, { color: 0xb8a888, speed: 1, up: 0.6, gravity: 3, life: 0.4, size: 0.3, additive: false }); },
@@ -116,6 +131,9 @@ const game = {
   klSeq: 0,
   regenAt: 0,
   spawnProt: 0,
+  // jurus Z & X, efek status
+  zCd: 0, xCd: 0, skSeq: 0, skEv: null,
+  buffs: {}, rootUntil: 0, iceUntil: 0, slowUntil: 0, glideUntil: 0, leap: false,
 };
 try { game.pvp = localStorage.getItem('elementalTycoon:pvp') !== '0'; } catch (e) { /* */ }
 const MAX_HP = 100;
@@ -236,8 +254,10 @@ function selectElement(el, card) {
     <div class="d-head"><span class="d-icon">${el.icon}</span><div><h3>${el.name}</h3><p>${el.desc}</p></div></div>
     <div class="d-row"><b>Pasif</b><span>${el.passiveText}</span></div>
     <div class="d-row"><b>[Q] Serang</b><span><i>${el.attack.name}</i></span></div>
+    <div class="d-row"><b>[Z] Gerak</b><span><i>${SKILLS[el.id].z.icon} ${SKILLS[el.id].z.name}</i> — ${SKILLS[el.id].z.desc}</span></div>
+    <div class="d-row"><b>[X] Jurus</b><span><i>${SKILLS[el.id].x.icon} ${SKILLS[el.id].x.name}</i> — ${SKILLS[el.id].x.desc}</span></div>
     <div class="d-row"><b>[E] Skill</b><span><i>${el.ability.name}</i> — ${el.ability.text}</span></div>
-    <div class="d-row"><b>[F] Ultimate</b><span><i>${el.ult.name}</i> — terbang + semua bonus x1.5</span></div>
+    <div class="d-row"><b>[F] Ultimate</b><span><i>${el.ult.name}</i> — ledakan pembuka, terbang + semua bonus x1.5</span></div>
     <div class="d-row"><b>👕 Kostum</b><span id="costumeLabel">${costumeName(selCostume, el)}</span></div>`;
   d.appendChild(costumeButtons(el, selCostume, (cid) => { selCostume = cid; saveCostume(el.id, cid); $('costumeLabel').textContent = costumeName(cid, el); showPreview(el); }));
   $('playBtn').disabled = false;
@@ -328,7 +348,7 @@ const handlers = {
       av.root.position.set(d.x, d.y, d.z);
       scene.add(av.root);
       r = { id, avatar: av, label, el, k: d.k || 'standar', target: new THREE.Vector3(d.x, d.y, d.z), ry: d.r || 0, s: 0, g: false, ab: d.ab, pq: d.pq, em: d.em, n: d.n, c: d.c || 0, u: 0,
-        hp: d.hp ?? MAX_HP, pv: d.pv ?? 1, dead: !!d.dead, klSeq: d.kl ? d.kl.s : 0, kc: d.kc || 0, hpBar: makeHpBar() };
+        hp: d.hp ?? MAX_HP, pv: d.pv ?? 1, dead: !!d.dead, klSeq: d.kl ? d.kl.s : 0, kc: d.kc || 0, hpBar: makeHpBar(), skSeq: d.sk ? d.sk.s : 0, bf: '' };
       r.hpBar.sprite.position.y = 3.85;
       av.root.add(r.hpBar.sprite);
       remotes.set(id, r);
@@ -343,6 +363,19 @@ const handlers = {
     r.hpBar.set(r.hp / MAX_HP, r.pv && game.pvp);
     if (d.dead && !r.dead) { r.avatar.play('knockout'); particles.emit(tmpW.copy(r.avatar.root.position).setY(r.avatar.root.position.y + 1), 50, { ...el.fx, speed: 5, life: 1.2 }); }
     r.dead = !!d.dead;
+    // jurus Z/X/ultimate dari pemain lain
+    if (d.sk && d.sk.s !== r.skSeq && Array.isArray(d.sk.p)) {
+      r.skSeq = d.sk.s;
+      const owner = { local: false, id, name: r.n || 'Pemain', el };
+      const P = new THREE.Vector3(d.sk.p[0], d.sk.p[1], d.sk.p[2]);
+      const D = new THREE.Vector3(d.sk.d[0], 0, d.sk.d[1]);
+      const A = new THREE.Vector3(d.sk.a[0], d.sk.a[1], d.sk.a[2]);
+      if (d.sk.i === 'slam') skillSys.slam(owner, P);
+      else { skillSys.cast(owner, d.sk.i, P, D, A); r.avatar.play(d.sk.i === 'x' ? 'skill' : 'castDash'); }
+    }
+    r.bf = d.bf || '';
+    r.avatar.root.visible = !r.bf.includes('invis');
+    setBubble(r, r.bf);
     if (d.kl && d.kl.s !== r.klSeq) {
       r.klSeq = d.kl.s;
       const killerName = d.kl.b === mp.id ? game.name : remotes.get(d.kl.b)?.n || 'Pemain';
@@ -456,8 +489,9 @@ async function startGame(el) {
   $('elName').textContent = el.name;
   $('elPassive').textContent = el.passiveText;
   $('elBadge').style.setProperty('--c', hex(el.color));
-  for (const id of ['btnAttack', 'abilityBtn', 'btnUlt']) $(id).style.setProperty('--c', hex(el.color));
+  for (const id of ['btnAttack', 'btnZ', 'btnX', 'abilityBtn', 'btnUlt']) $(id).style.setProperty('--c', hex(el.color));
   $('atkIcon').textContent = el.icon; $('atkName').textContent = el.attack.name;
+  if (SKILLS[el.id]) { $('zIcon').textContent = SKILLS[el.id].z.icon; $('zName').textContent = SKILLS[el.id].z.name; $('xIcon').textContent = SKILLS[el.id].x.icon; $('xName').textContent = SKILLS[el.id].x.name; }
   $('abIcon').textContent = el.icon; $('abName').textContent = el.ability.name;
   $('ultIcon').textContent = '👑'; $('ultName').textContent = el.ult.name;
   $('netStatus').textContent = mp.online ? `🟢 Online · room ${mp.room}` : '⚪ Offline';
@@ -616,7 +650,9 @@ function ultimate() {
   player.vel.y = 10; player.onGround = false;
   sfx.ult();
   toast(`👑 ${el.ult.name}! Tahan Spasi untuk terbang`, hex(el.glow));
-  sendState(true);
+  const p0 = player.pos.clone(), d0 = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing));
+  skillSys.cast({ local: true, id: mp.id, name: game.name, el }, 'u', p0, d0, p0);
+  broadcastSkill('u', p0, d0, p0);
 }
 
 function useAbility() {
@@ -677,6 +713,7 @@ const shielded = () => game.plot && game.plot.contains(player.pos);
 const powerWorld = {
   solidAt(p) {
     if (p.y <= 0.02) return true;
+    if (skillSys.blocks(p)) return true;
     for (const plot of plots) {
       if (Math.abs(p.x - plot.center.x) > 22 || Math.abs(p.z - plot.center.z) > 22) continue;
       plot.toLocal(p, tmpL);
@@ -716,27 +753,114 @@ function predictHit(r, a) {
 
 // kita terkena serangan pemain lain
 function getHit(dir, owner, a) {
-  if (game.hitCd > 0 || game.dead) return;
-  game.hitCd = 0.35;
+  const r = remotes.get(owner.id);
+  applyDamage(damageOf(a, r && r.u), owner, dir, {});
+}
+
+const buffOn = (name) => { const b = game.buffs[name]; return b && game.t < b.until; };
+function buffDamageMult() {
+  let m = 1;
+  for (const [k, b] of Object.entries(game.buffs)) if (game.t < b.until && b.dmgMult !== undefined) m *= b.dmgMult;
+  return m;
+}
+
+// semua damage ke diri sendiri lewat sini (serangan Q, jurus area, ledakan ultimate)
+function applyDamage(amount, owner, dir, status) {
+  if (game.dead || game.state !== 'playing') return;
+  if (!status.small && game.hitCd > 0) return;
+  if (!status.small) game.hitCd = 0.3;
   const r = remotes.get(owner.id);
   if (shielded() || game.t < game.spawnProt || !game.pvp || (r && !r.pv)) {
-    effects.shockwave(player.pos, 0x80d8ff, 3);
+    if (!status.small) effects.shockwave(player.pos, 0x80d8ff, 3);
     if (!game.pvp && !game.peaceHint) { game.peaceHint = true; toast('🕊️ PvP kamu OFF — serangan tidak berpengaruh', '#80d8ff'); }
     return;
   }
-  const dmg = damageOf(a, r && r.u);
+  const mult = buffDamageMult();
+  if (mult <= 0) { effects.shockwave(tmpW.copy(player.pos).setY(player.pos.y + 1), 0x00e5ff, 2.5); return; }
+  const dmg = Math.max(1, Math.round(amount * mult * (ultActive() ? 0.7 : 1)));
   game.hp = Math.max(0, game.hp - dmg);
   game.regenAt = game.t + 4;
-  player.dash.set(dir.x * 18, 0, dir.z * 18);
-  player.vel.y = 6;
-  player.onGround = false;
-  game.shake = Math.max(game.shake, 0.5);
+  // efek status
+  if (status.pull) player.dash.addScaledVector(status.pull, 0.5);
+  if (status.root) { game.rootUntil = game.t + status.root; toast('🌱 Terjerat akar!', '#9cff6e'); }
+  if (status.freeze) { game.rootUntil = game.iceUntil = game.t + status.freeze; toast('🧊 Kamu membeku!', '#b3f0ff'); }
+  if (status.slow) game.slowUntil = Math.max(game.slowUntil, game.t + status.slow);
+  const noKnock = buffOn('armor') || status.root || status.freeze;
+  if (!status.small && !noKnock) {
+    const k = status.knock || 18;
+    player.dash.set(dir.x * k, 0, dir.z * k);
+    player.vel.y = 6;
+    player.onGround = false;
+  }
+  game.shake = Math.max(game.shake, status.small ? 0.15 : 0.5);
   sfx.hit();
-  player.avatar.play('hurt');
-  floatText(tmpW.copy(player.pos).setY(player.pos.y + 3.2), '-' + dmg, '#ff5252');
-  particles.emit(tmpW.copy(player.pos).setY(player.pos.y + 1.4), 14, { color: 0xff5252, color2: 0xffffff, speed: 3, life: 0.5, size: 0.3 });
+  if (!status.small) player.avatar.play('hurt');
+  floatText(tmpW.copy(player.pos).setY(player.pos.y + 3.2 + Math.random() * 0.4), '-' + dmg, '#ff5252');
+  particles.emit(tmpW.copy(player.pos).setY(player.pos.y + 1.4), status.small ? 5 : 14, { color: 0xff5252, color2: 0xffffff, speed: 3, life: 0.5, size: 0.3 });
   $('hpWrap').classList.add('hit'); setTimeout(() => $('hpWrap').classList.remove('hit'), 250);
   if (game.hp <= 0) defeated(owner);
+  sendState(!status.small);
+}
+
+// prediksi damage di pemain lain (hanya tampilan)
+function canHitRemote(r) { return game.pvp && r.pv && !r.sp && !r.dead && !remoteInOwnBase(r); }
+function predictDamage(r, amount, status = {}) {
+  if (!canHitRemote(r)) { effects.shockwave(r.avatar.root.position, 0x80d8ff, 2); return; }
+  if (r.bf.includes('hexshield')) { effects.shockwave(tmpW.copy(r.avatar.root.position).setY(r.avatar.root.position.y + 1), 0x00e5ff, 2.5); return; }
+  r.avatar.play('hurt');
+  floatText(tmpW.copy(r.avatar.root.position).setY(r.avatar.root.position.y + 3.2 + Math.random() * 0.4), '-' + Math.round(amount), '#ff6b6b');
+}
+
+// gelembung perisai (perisai energi / daun / zirah)
+const BUBBLE_COL = { hexshield: 0x00e5ff, leafshield: 0x66bb6a, armor: 0xcfd8dc };
+function setBubble(holder, bf) {
+  const key = Object.keys(BUBBLE_COL).find((k) => bf.includes(k)) || '';
+  if (!holder.bubble) {
+    holder.bubble = new THREE.Mesh(new THREE.SphereGeometry(1.7, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+    holder.bubble.position.y = 1.4;
+    holder.avatar.root.add(holder.bubble);
+  }
+  if (holder.bubble.parent !== holder.avatar.root) holder.avatar.root.add(holder.bubble);
+  holder.bubble.visible = !!key;
+  if (key) holder.bubble.material.color.set(BUBBLE_COL[key]).multiplyScalar(1.5);
+}
+const activeBuffs = () => Object.keys(game.buffs).filter((k) => buffOn(k)).join(',');
+
+// ---------- JURUS [Z] & [X] ----------
+const aimH = new THREE.Vector3();
+function useSkill(slot) {
+  if (game.state !== 'playing' || game.dead) return;
+  const el = game.element, sk = SKILLS[el.id] && SKILLS[el.id][slot];
+  if (!sk) return;
+  const cdKey = slot + 'Cd';
+  if (game[cdKey] > 0) return;
+  if (game.t < game.rootUntil && ['dash', 'blink', 'leap', 'superjump'].includes(sk.type)) { toast('Tidak bisa bergerak saat terjerat!', '#ff8a80'); return; }
+  game[cdKey] = sk.cd;
+  camera.getWorldDirection(aimH); aimH.y = 0; aimH.normalize();
+  player.facing = Math.atan2(aimH.x, aimH.z);
+  const pos = player.pos.clone();
+  const aim = pos.clone().addScaledVector(aimH, sk.type === 'blink' ? sk.dist : 14);
+  aim.y = Math.max(0, pos.y);
+  switch (sk.type) {
+    case 'dash': player.dash.copy(aimH).multiplyScalar(sk.dist * 5); game.trailUntil = game.t + 0.45; break;
+    case 'blink': player.pos.addScaledVector(aimH, sk.dist); player.pos.x = clamp(player.pos.x, -WORLD_LIMIT, WORLD_LIMIT); player.pos.z = clamp(player.pos.z, -WORLD_LIMIT, WORLD_LIMIT); player.vel.set(0, 0, 0); break;
+    case 'buff':
+      game.buffs[sk.buff] = { until: game.t + sk.dur, dmgMult: sk.dmgMult, speed: sk.speed, noKnock: sk.noKnock };
+      if (sk.heal) game.hp = Math.min(MAX_HP, game.hp + sk.heal);
+      break;
+    case 'heal': game.hp = Math.min(MAX_HP, game.hp + sk.heal); game.rootUntil = game.iceUntil = game.slowUntil = 0; floatText(tmpW.copy(player.pos).setY(player.pos.y + 3.3), '+' + sk.heal, '#7dff9b'); break;
+    case 'leap': player.vel.y = sk.vy; player.onGround = false; player.dash.copy(aimH).multiplyScalar(sk.forward * 2); game.leap = true; break;
+    case 'superjump': player.vel.y = sk.vy; player.onGround = false; game.glideUntil = game.t + 6; break;
+  }
+  skillSys.cast({ local: true, id: mp.id, name: game.name, el }, slot, pos, aimH, aim);
+  player.avatar.play(slot === 'x' ? 'skill' : sk.type === 'buff' || sk.type === 'heal' ? 'cheer' : 'castDash');
+  sfx.ability(el.id);
+  toast(`${sk.icon} ${sk.name}!`, hex(el.glow));
+  broadcastSkill(slot, pos, aimH, aim);
+}
+function broadcastSkill(i, pos, dir, aim) {
+  const f = (n) => +n.toFixed(2);
+  game.skEv = { i, s: ++game.skSeq, p: [f(pos.x), f(pos.y), f(pos.z)], d: [f(dir.x), f(dir.z)], a: [f(aim.x), f(aim.y), f(aim.z)] };
   sendState(true);
 }
 
@@ -886,7 +1010,10 @@ function updatePlayer(dt) {
     if (!game.swimHint) { game.swimHint = true; toast('🏊 Berenang! Spasi = lompat keluar dari air', '#80d8ff'); }
   }
   player.swimming = swimming;
-  const spMult = passive(el, 'speed') * boost('speed') * (ult ? 1.3 : 1) * (swimming ? 0.55 : wading ? 0.75 : 1);
+  let buffSpeed = 1;
+  for (const b of Object.values(game.buffs)) if (game.t < b.until && b.speed) buffSpeed *= b.speed;
+  const rooted = game.t < game.rootUntil;
+  const spMult = passive(el, 'speed') * boost('speed') * (ult ? 1.3 : 1) * (swimming ? 0.55 : wading ? 0.75 : 1) * buffSpeed * (game.t < game.slowUntil ? 0.5 : 1) * (rooted ? 0 : 1);
   const maxSpeed = (sprint ? 11.5 : 7.5) * spMult;
   fwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
   right.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
@@ -897,13 +1024,15 @@ function updatePlayer(dt) {
   if (wish.lengthSq() > 0.01) player.facing = lerpAngle(player.facing, Math.atan2(wish.x, wish.z), 1 - Math.exp(-12 * dt));
 
   let jumped = false;
-  if (input.hit('Space') && (player.onGround || swimming)) {
+  if (input.hit('Space') && (player.onGround || swimming) && !rooted) {
     player.vel.y = swimming ? 9 : 9.6 * Math.sqrt(passive(el, 'jump') * (boost('speed') > 1 ? 1.6 : 1));
     player.onGround = false;
     jumped = true;
     if (swimming) { sfx.splash(); particles.emit(tmpW.set(player.pos.x, WATER_Y + 0.2, player.pos.z), 30, { color: 0xb3e5fc, color2: 0xffffff, speed: 4, up: 4, gravity: 14, life: 0.8, size: 0.3 }); } else sfx.jump();
   }
   if (input.hit('KeyE')) useAbility();
+  if (input.hit('KeyZ')) useSkill('z');
+  if (input.hit('KeyX')) useSkill('x');
   if (input.hit('KeyQ') || input.hit('Click')) attack();
   if (input.hit('KeyF')) ultimate();
   if (input.hit('KeyR')) respawn();
@@ -947,6 +1076,18 @@ function updatePlayer(dt) {
   } else if (player.pos.y > col.ground + 0.08) {
     player.onGround = false;
   }
+  // melayang (Lompatan Angin) & hantaman mendarat (Lompatan Raksasa)
+  if (game.t < game.glideUntil && !player.onGround && player.vel.y < -2.5) { player.vel.y = -2.5; if (Math.random() < dt * 20) particles.emit(tmpW.copy(player.pos).setY(player.pos.y + 1), 1, { ...el.fx, speed: 1, life: 0.5 }); }
+  if (player.onGround) game.glideUntil = 0;
+  if (game.leap && wasAir && player.onGround) {
+    game.leap = false;
+    const owner = { local: true, id: mp.id, name: game.name, el };
+    skillSys.slam(owner, player.pos.clone());
+    broadcastSkill('slam', player.pos, new THREE.Vector3(0, 0, 1), player.pos);
+  }
+  if (game.t < (game.trailUntil || 0)) particles.emit(tmpW.copy(player.pos).setY(player.pos.y + 0.8), 4, { ...el.fx, speed: 1, spread: 0.4, life: 0.9, size: (el.fx.size || 0.4) * 1.3 });
+  if (game.t < game.iceUntil && Math.random() < dt * 10) particles.emit(tmpW.copy(player.pos).setY(player.pos.y + 1.2), 2, { color: 0xe0f7fa, color2: 0x80deea, speed: 0.6, spread: 0.6, life: 0.8 });
+  if (rooted && game.t >= game.iceUntil && Math.random() < dt * 8) particles.emit(tmpW.copy(player.pos).setY(player.pos.y + 0.4), 2, { color: 0x66bb6a, color2: 0x4e342e, speed: 0.8, up: 1, life: 0.6 });
   if (wasAir && player.onGround && fallV < -9) {
     particles.emit(tmpW.set(player.pos.x, player.pos.y + 0.2, player.pos.z), 18, { ...el.fx, speed: 4, up: 1, spread: 0.4, life: 0.6 });
     effects.shockwave(player.pos, el.color, 2.5);
@@ -1073,6 +1214,8 @@ function sendState(force = false) {
   };
   if (game.pd) st.pd = game.pd;
   if (game.kl) st.kl = game.kl;
+  if (game.skEv) st.sk = game.skEv;
+  st.bf = activeBuffs();
   mp.sendState(st, force);
 }
 
@@ -1091,6 +1234,7 @@ function updateHud(dt) {
   cdButton('abilityBtn', 'abCd', game.abilityCd, el.ability.cooldown);
   cdButton('btnAttack', 'atkCd', game.atkCd, el.attack.cooldown);
   cdButton('btnUlt', 'ultCd', game.ultCd, el.ult.cooldown);
+  if (SKILLS[el.id]) { cdButton('btnZ', 'zCdT', game.zCd, SKILLS[el.id].z.cd); cdButton('btnX', 'xCdT', game.xCd, SKILLS[el.id].x.cd); }
   $('btnUlt').classList.toggle('active', ultActive());
   $('hpFill').style.width = (game.hp / MAX_HP * 100) + '%';
   $('hpFill').style.background = game.hp > 50 ? '#4cff7a' : game.hp > 25 ? '#ffd54f' : '#ff5252';
@@ -1108,6 +1252,11 @@ function updateHud(dt) {
     if (b && game.t < b.until) bs.push(`<span>${labels[k]} x${b.mult} · ${Math.ceil(b.until - game.t)}d</span>`);
   }
   if (game.nextOre.count > 0) bs.push(`<span>✨ Ore spesial x${game.nextOre.mult} · ${game.nextOre.count} lagi</span>`);
+  const BUFF_TXT = { surf: '🏄 Selancar', leafshield: '🌿 Perisai Daun', hexshield: '🛡️ Perisai Energi', iceslide: '⛸️ Seluncur Es', invis: '👻 Tak terlihat', armor: '🦾 Zirah Baja' };
+  for (const [k, b] of Object.entries(game.buffs)) if (game.t < b.until) bs.push(`<span>${BUFF_TXT[k] || k} · ${Math.ceil(b.until - game.t)}d</span>`);
+  if (game.t < game.iceUntil) bs.push('<span class="bad">🧊 Membeku</span>');
+  else if (game.t < game.rootUntil) bs.push('<span class="bad">🌱 Terjerat</span>');
+  if (game.t < game.slowUntil) bs.push('<span class="bad">🧪 Melambat</span>');
   if (shielded()) bs.push('<span class="safe">🛡 Zona aman markas</span>');
   else if (game.t < game.spawnProt) bs.push('<span class="safe">🛡 Perlindungan</span>');
   $('boosts').innerHTML = bs.join('');
@@ -1130,6 +1279,9 @@ function loop() {
     game.abilityCd = Math.max(0, game.abilityCd - dt);
     game.atkCd = Math.max(0, game.atkCd - dt);
     game.ultCd = Math.max(0, game.ultCd - dt);
+    game.zCd = Math.max(0, game.zCd - dt);
+    game.xCd = Math.max(0, game.xCd - dt);
+    if (player.avatar) setBubble(player, activeBuffs());
     game.hitCd = Math.max(0, game.hitCd - dt);
     if (!game.dead && game.hp < MAX_HP && game.t > game.regenAt) game.hp = Math.min(MAX_HP, game.hp + 8 * dt);
   }
@@ -1146,6 +1298,7 @@ function loop() {
   updateRemotes(dt);
   villagers.update(dt, game.state === 'playing' ? player.pos : camLook);
   powers.update(dt, powerWorld);
+  skillSys.update(dt, game.t);
   elFx.update(dt);
   updateFloats(dt);
   crystals.update(dt, game.state === 'playing' ? player.pos : null);
@@ -1169,4 +1322,5 @@ window.game = game;
 game.player = player;
 game._handlers = handlers; // untuk debug/tes multiplayer
 game._scene = scene;
+game._skills = skillSys;
 game.setHour = (h) => (h == null ? world.clearHour() : world.setHour(h)); // contoh: game.setHour(20)

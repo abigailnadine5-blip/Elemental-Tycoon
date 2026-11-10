@@ -77,6 +77,8 @@ export class Input {
     btn('abilityBtn', 'KeyE');
     btn('btnAttack', 'KeyQ');
     btn('btnUlt', 'KeyF');
+    btn('btnZ', 'KeyZ');
+    btn('btnX', 'KeyX');
   }
 
   down(...codes) { return this.enabled && codes.some((c) => this.keys.has(c)); }

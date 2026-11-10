@@ -37,6 +37,8 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 | Putar kamera | Drag mouse | Geser layar kanan |
 | Zoom | Scroll | – |
 | Serangan elemen | Q / klik kiri | Tombol besar |
+| Jurus gerak / pertahanan | Z | Tombol Z |
+| Jurus area | X | Tombol X |
 | Skill tycoon | E | Tombol skill |
 | Ultimate (terbang: tahan Spasi) | F | Tombol 👑 |
 | Emote | 1–5 | 😀 |
@@ -60,6 +62,25 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 | 🌑 Bayangan | Hoodie gelap + jubah ungu | +15% dropper, harga -5% | Orb Bayangan (mengejar) | **Langkah Bayangan** – teleport ke pad uang | Raja Kegelapan |
 | ☠️ Racun | Kaos tetesan racun + tabung | +15% nilai, +5% dropper | Bom Racun (kabut) | **Kabut Racun** – nilai ore 2.2x 9 dtk | Wabah Hijau |
 | ⚙️ Logam | Baju zirah + perisai | Upgrader +15%, nilai +10% | Shuriken Baja | **Tempa Baja** – upgrader 1.8x 15 dtk | Ksatria Baja |
+
+### ✨ Jurus tambahan [Z] gerak/pertahanan & [X] jurus area
+
+| Elemen | [Z] | [X] |
+|---|---|---|
+| 🔥 Api | 🚀 Roket Api — melesat meninggalkan jejak api | ☄️ Hujan Meteor — 6 meteor jatuh |
+| 💧 Air | 🏄 Selancar Ombak — super cepat 4 dtk | 🌀 Pusaran Air — menyedot & melukai |
+| 🍃 Daun | 🌿 Perisai Daun — +30 HP, damage -70% | 🌱 Akar Penjerat — musuh terjerat 2 dtk |
+| ⚡ Listrik | ⚡ Teleport Kilat — 15 m ke depan | 🌩️ Badai Petir — menyambar semua musuh di sekitar |
+| 🤖 Techno | 🛡️ Perisai Energi — kebal 4 dtk | 🛸 Drone Laser — menembak musuh terdekat 7 dtk |
+| 🌋 Gempa | 🦘 Lompatan Raksasa — menghantam tanah saat mendarat | 🧱 Tembok Batu — menahan serangan 7 dtk |
+| ❄️ Es | ⛸️ Seluncur Es — meluncur cepat | 🧊 Penjara Es — musuh membeku 2 dtk |
+| 🌪️ Angin | 🪽 Lompatan Angin — lompat super tinggi & melayang | 🌪️ Tornado Raksasa — berjalan menyedot musuh |
+| ✨ Cahaya | 💖 Cahaya Penyembuh — +55 HP & hapus beku/jerat | 🌟 Hujan Cahaya — 5 sinar suci |
+| 🌑 Bayangan | 👻 Menghilang — tak terlihat 4 dtk | 🦇 Cakar Bayangan — duri berbaris ke depan |
+| ☠️ Racun | 😷 Kabut Pelindung — racun di sekelilingmu | 🧪 Kolam Asam — melukai & memperlambat |
+| ⚙️ Logam | 🦾 Zirah Baja — damage -60%, tak terpental | 🔪 Badai Pisau — pisau berputar di sekitarmu |
+
+Ultimate [F] kini juga diawali **ledakan** yang melukai musuh di sekitar.
 
 **Ultimate [F]** (12 detik, cooldown 70 dtk): karakter membesar dengan aura elemen, bisa **terbang** (tahan Spasi), dropper & nilai ore x1.5, serangan hampir tanpa jeda.
 
@@ -145,6 +166,7 @@ src/
   world.js            langit, cahaya, tanah, pohon, plaza
   particles.js        sistem partikel & efek (petir, gelombang kejut)
   powers.js           serangan [Q] (proyektil & sinar) + Kristal Elemen
+  skills.js           24 jurus [Z]/[X] + ledakan ultimate
   multiplayer.js      integrasi Firebase (auth anonim, realtime database)
   input.js            keyboard, mouse, joystick sentuh
   audio.js            efek suara sintetis (WebAudio)

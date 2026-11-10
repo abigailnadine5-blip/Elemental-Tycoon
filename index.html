@@ -10,7 +10,7 @@
   <script>
     // Auto-update: kalau ada versi baru di server, muat ulang halaman tanpa cache lama.
     // Saat update game, naikkan GAME_VERSION di sini, angka ?v= di bawah, dan isi version.json.
-    window.GAME_VERSION = '10';
+    window.GAME_VERSION = '11';
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((j) => {
@@ -24,33 +24,34 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-        "./src/ambient.js": "./src/ambient.js?v=10",
-        "./src/animator.js": "./src/animator.js?v=10",
-        "./src/audio.js": "./src/audio.js?v=10",
-        "./src/character.js": "./src/character.js?v=10",
-        "./src/daynight.js": "./src/daynight.js?v=10",
-        "./src/elementfx.js": "./src/elementfx.js?v=10",
-        "./src/elements.js": "./src/elements.js?v=10",
-        "./src/input.js": "./src/input.js?v=10",
-        "./src/multiplayer.js": "./src/multiplayer.js?v=10",
-        "./src/nature.js": "./src/nature.js?v=10",
-        "./src/noise.js": "./src/noise.js?v=10",
-        "./src/npcs.js": "./src/npcs.js?v=10",
-        "./src/particles.js": "./src/particles.js?v=10",
-        "./src/powers.js": "./src/powers.js?v=10",
-        "./src/river.js": "./src/river.js?v=10",
-        "./src/riverpath.js": "./src/riverpath.js?v=10",
-        "./src/textures.js": "./src/textures.js?v=10",
-        "./src/tycoon.js": "./src/tycoon.js?v=10",
-        "./src/util.js": "./src/util.js?v=10",
-        "./src/world.js": "./src/world.js?v=10",
-        "./firebase-config.js": "./firebase-config.js?v=10"
+        "./src/ambient.js": "./src/ambient.js?v=11",
+        "./src/animator.js": "./src/animator.js?v=11",
+        "./src/audio.js": "./src/audio.js?v=11",
+        "./src/character.js": "./src/character.js?v=11",
+        "./src/daynight.js": "./src/daynight.js?v=11",
+        "./src/elementfx.js": "./src/elementfx.js?v=11",
+        "./src/elements.js": "./src/elements.js?v=11",
+        "./src/input.js": "./src/input.js?v=11",
+        "./src/multiplayer.js": "./src/multiplayer.js?v=11",
+        "./src/nature.js": "./src/nature.js?v=11",
+        "./src/noise.js": "./src/noise.js?v=11",
+        "./src/npcs.js": "./src/npcs.js?v=11",
+        "./src/particles.js": "./src/particles.js?v=11",
+        "./src/powers.js": "./src/powers.js?v=11",
+        "./src/river.js": "./src/river.js?v=11",
+        "./src/riverpath.js": "./src/riverpath.js?v=11",
+        "./src/skills.js": "./src/skills.js?v=11",
+        "./src/textures.js": "./src/textures.js?v=11",
+        "./src/tycoon.js": "./src/tycoon.js?v=11",
+        "./src/util.js": "./src/util.js?v=11",
+        "./src/world.js": "./src/world.js?v=11",
+        "./firebase-config.js": "./firebase-config.js?v=11"
       }
     }
   </script>
@@ -72,6 +73,7 @@
       <div id="howPanel" class="how hidden">
         <p><b>WASD / Joystick</b> — jalan · <b>Shift</b> — lari · <b>Spasi</b> — lompat</p>
         <p><b>Drag mouse / layar kanan</b> — putar kamera · <b>Scroll</b> — zoom</p>
+        <p><b>Z</b> — jurus gerak/pertahanan · <b>X</b> — jurus area</p>
         <p><b>Q / klik</b> — serangan elemen (⚔️ PvP: kalahkan pemain lain untuk dapat uang!) · <b>E</b> — skill tycoon · <b>F</b> — ultimate (bisa terbang)</p>
         <p><b>1–5</b> — emote (lambai, joget, hormat, pamer, menang) · <b>👕</b> — ganti kostum</p>
         <p><b>Enter</b> — chat · <b>R</b> — kembali ke markas</p>
@@ -80,7 +82,7 @@
           lalu injak <b style="color:#ffd54f">pad uang</b> untuk mengambil uangmu.</p>
       </div>
       <div id="netInfo" class="net-info"></div>
-      <div class="version">Versi 4.4 (v10) · ⚔️ PvP: lawan pemain lain · 🌐 Multiplayer · 🏊 Berenang · 🌲 Hutan</div>
+      <div class="version">Versi 4.5 (v11) · ✨ 24 jurus baru [Z] &amp; [X] · ⚔️ PvP · 🌐 Multiplayer · 🏊 Berenang</div>
     </div>
   </section>
 
@@ -132,6 +134,8 @@
     </div>
     <div class="powerbar">
       <button id="btnAttack" class="power ready"><span class="p-icon" id="atkIcon"></span><span class="p-name" id="atkName"></span><span class="key">Q</span><span id="atkCd" class="cd"></span></button>
+      <button id="btnZ" class="power ready"><span class="p-icon" id="zIcon"></span><span class="p-name" id="zName"></span><span class="key">Z</span><span id="zCdT" class="cd"></span></button>
+      <button id="btnX" class="power ready"><span class="p-icon" id="xIcon"></span><span class="p-name" id="xName"></span><span class="key">X</span><span id="xCdT" class="cd"></span></button>
       <button id="abilityBtn" class="power ready"><span class="p-icon" id="abIcon"></span><span class="p-name" id="abName"></span><span class="key">E</span><span id="abCd" class="cd"></span></button>
       <button id="btnUlt" class="power ult ready"><span class="p-icon" id="ultIcon"></span><span class="p-name" id="ultName"></span><span class="key">F</span><span id="ultCd" class="cd"></span></button>
     </div>
@@ -139,13 +143,13 @@
     <div id="joystick" class="joystick"><div id="joyKnob"></div></div>
     <div id="help" class="help">
       <button id="helpClose">✕</button>
-      <b>Kontrol:</b> WASD jalan · Spasi lompat · Drag mouse kamera · <b>Q/klik</b> serang · <b>E</b> skill · <b>F</b> ultimate (tahan Spasi = terbang) · <b>1–5</b> emote · 👕 kostum
+      <b>Kontrol:</b> WASD jalan · Spasi lompat · Drag mouse kamera · <b>Q/klik</b> serang · <b>Z</b> gerak · <b>X</b> jurus · <b>E</b> skill · <b>F</b> ultimate (tahan Spasi = terbang) · <b>1–5</b> emote · 👕 kostum
     </div>
   </section>
 
   <div id="loading" class="loading"><div class="spinner"></div><p id="loadingText">Memuat dunia...</p></div>
   <noscript>Game ini butuh JavaScript.</noscript>
 
-  <script type="module" src="src/main.js?v=10"></script>
+  <script type="module" src="src/main.js?v=11"></script>
 </body>
 </html>
