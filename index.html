@@ -10,7 +10,7 @@
   <script>
     // Auto-update: kalau ada versi baru di server, muat ulang halaman tanpa cache lama.
     // Saat update game, naikkan GAME_VERSION di sini, angka ?v= di bawah, dan isi version.json.
-    window.GAME_VERSION = '9';
+    window.GAME_VERSION = '10';
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((j) => {
@@ -24,33 +24,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-        "./src/ambient.js": "./src/ambient.js?v=9",
-        "./src/animator.js": "./src/animator.js?v=9",
-        "./src/audio.js": "./src/audio.js?v=9",
-        "./src/character.js": "./src/character.js?v=9",
-        "./src/daynight.js": "./src/daynight.js?v=9",
-        "./src/elementfx.js": "./src/elementfx.js?v=9",
-        "./src/elements.js": "./src/elements.js?v=9",
-        "./src/input.js": "./src/input.js?v=9",
-        "./src/multiplayer.js": "./src/multiplayer.js?v=9",
-        "./src/nature.js": "./src/nature.js?v=9",
-        "./src/noise.js": "./src/noise.js?v=9",
-        "./src/npcs.js": "./src/npcs.js?v=9",
-        "./src/particles.js": "./src/particles.js?v=9",
-        "./src/powers.js": "./src/powers.js?v=9",
-        "./src/river.js": "./src/river.js?v=9",
-        "./src/riverpath.js": "./src/riverpath.js?v=9",
-        "./src/textures.js": "./src/textures.js?v=9",
-        "./src/tycoon.js": "./src/tycoon.js?v=9",
-        "./src/util.js": "./src/util.js?v=9",
-        "./src/world.js": "./src/world.js?v=9",
-        "./firebase-config.js": "./firebase-config.js?v=9"
+        "./src/ambient.js": "./src/ambient.js?v=10",
+        "./src/animator.js": "./src/animator.js?v=10",
+        "./src/audio.js": "./src/audio.js?v=10",
+        "./src/character.js": "./src/character.js?v=10",
+        "./src/daynight.js": "./src/daynight.js?v=10",
+        "./src/elementfx.js": "./src/elementfx.js?v=10",
+        "./src/elements.js": "./src/elements.js?v=10",
+        "./src/input.js": "./src/input.js?v=10",
+        "./src/multiplayer.js": "./src/multiplayer.js?v=10",
+        "./src/nature.js": "./src/nature.js?v=10",
+        "./src/noise.js": "./src/noise.js?v=10",
+        "./src/npcs.js": "./src/npcs.js?v=10",
+        "./src/particles.js": "./src/particles.js?v=10",
+        "./src/powers.js": "./src/powers.js?v=10",
+        "./src/river.js": "./src/river.js?v=10",
+        "./src/riverpath.js": "./src/riverpath.js?v=10",
+        "./src/textures.js": "./src/textures.js?v=10",
+        "./src/tycoon.js": "./src/tycoon.js?v=10",
+        "./src/util.js": "./src/util.js?v=10",
+        "./src/world.js": "./src/world.js?v=10",
+        "./firebase-config.js": "./firebase-config.js?v=10"
       }
     }
   </script>
@@ -72,7 +72,7 @@
       <div id="howPanel" class="how hidden">
         <p><b>WASD / Joystick</b> — jalan · <b>Shift</b> — lari · <b>Spasi</b> — lompat</p>
         <p><b>Drag mouse / layar kanan</b> — putar kamera · <b>Scroll</b> — zoom</p>
-        <p><b>Q / klik</b> — serangan elemen · <b>E</b> — skill tycoon · <b>F</b> — ultimate (bisa terbang)</p>
+        <p><b>Q / klik</b> — serangan elemen (⚔️ PvP: kalahkan pemain lain untuk dapat uang!) · <b>E</b> — skill tycoon · <b>F</b> — ultimate (bisa terbang)</p>
         <p><b>1–5</b> — emote (lambai, joget, hormat, pamer, menang) · <b>👕</b> — ganti kostum</p>
         <p><b>Enter</b> — chat · <b>R</b> — kembali ke markas</p>
         <p>Beli <b>Lantai 2, Lantai 3 &amp; Rooftop</b> lalu naik tangga di samping markas. Hancurkan 💎 Kristal Elemen di padang rumput untuk bonus uang!</p>
@@ -80,7 +80,7 @@
           lalu injak <b style="color:#ffd54f">pad uang</b> untuk mengambil uangmu.</p>
       </div>
       <div id="netInfo" class="net-info"></div>
-      <div class="version">Versi 4.3 (v9) · 🌐 Multiplayer Firebase · 🏊 Berenang · 🌲 Hutan · 🌅 Siang &amp; 🌙 Malam</div>
+      <div class="version">Versi 4.4 (v10) · ⚔️ PvP: lawan pemain lain · 🌐 Multiplayer · 🏊 Berenang · 🌲 Hutan</div>
     </div>
   </section>
 
@@ -110,6 +110,7 @@
     </div>
     <div class="hud-tr">
       <div class="top-btns">
+        <button id="pvpBtn" class="btn ghost small on" title="PvP ON/OFF">⚔️</button>
         <button id="costumeBtn" class="btn ghost small" title="Lemari Kostum">👕</button>
         <button id="emoteBtn" class="btn ghost small" title="Emote (1-5)">😀</button>
         <button id="chatBtn" class="btn ghost small hidden" title="Chat (Enter)">💬</button>
@@ -123,6 +124,8 @@
     </div>
     <div id="clock" class="clock"></div>
     <div id="toasts" class="toasts"></div>
+    <div id="killFeed" class="kill-feed"></div>
+    <div id="hpWrap" class="hp-wrap"><div class="hp-bar"><div id="hpFill"></div></div><span id="hpText">❤️ 100</span></div>
     <div class="chat">
       <div id="chatLog" class="chat-log"></div>
       <input id="chatInput" class="hidden" maxlength="120" placeholder="Ketik pesan lalu Enter..." autocomplete="off" />
@@ -143,6 +146,6 @@
   <div id="loading" class="loading"><div class="spinner"></div><p id="loadingText">Memuat dunia...</p></div>
   <noscript>Game ini butuh JavaScript.</noscript>
 
-  <script type="module" src="src/main.js?v=9"></script>
+  <script type="module" src="src/main.js?v=10"></script>
 </body>
 </html>

@@ -18,6 +18,7 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 - **Sungai mengalir** dari ngarai pegunungan, berkelok di padang, masuk ke danau lalu keluar lagi — lengkap dengan tepian pasir, batu, batu pijakan & alang-alang
 - **Suasana hidup**: awan berarak, kawanan burung, danau beriak dengan dermaga & alang-alang, rumput bergoyang, warga NPC di plaza yang jalan-jalan, melambai, joget & duduk
 - **Animasi karakter ber-rig** (siku, lutut, pergelangan kaki): langkah jalan/lari sinkron, condong saat belok, mendarat, gerakan iseng saat diam, gaya jalan per kostum (ninja, berat, robot, penyihir...)
+- **⚔️ PvP — lawan pemain lain**: tiap pemain punya ❤️ 100 HP. Serangan [Q] memberi damage (Ultimate = damage x1.5 & menerima damage lebih sedikit). Kalah → jatuh, kehilangan 10% uang, bangkit di markas dengan perlindungan 4 detik. Pemenang dapat uang korban + bonus, dan jumlah kill ⚔ tampil di papan peringkat. Markas sendiri = zona aman. HP pulih sendiri setelah 4 detik tidak terkena. Tombol ⚔️/🕊️ untuk menyalakan/mematikan PvP (mode damai)
 - **Kristal Elemen** muncul di padang rumput — hancurkan dengan serangan [Q] untuk bonus uang
 - Grafik "realistis": langit fisik, bayangan lembut, refleksi lingkungan (PBR), bloom/glow, kabut, pohon & gunung
 - Gameplay tycoon klasik: **Dropper → Conveyor → Upgrader → Collector → Pad Uang**

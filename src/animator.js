@@ -196,6 +196,9 @@ export const ACTIONS = {
     const a = smooth(0, 0.3, t), b = smooth(0.3, 0.45, t);
     return { aRf: lerp(2.8 * a, 0.6, b), aRo: lerp(0.5 * a, -0.3, b), aRe: lerp(0.6, 0.1, b), wTwist: lerp(0.5 * a, -0.6, b), lean: 0.2 * b, lLf: 0.45 * b, lLk: 0.4 * b, lRf: -0.35 * b, aLf: 0.4, aLe: 1.2 };
   } },
+  // ---- PvP: terkena serangan & kalah ----
+  hurt: { dur: 0.38, in: 0.02, out: 0.15, expr: 'sad', f: (t) => { const k = hit(t, 0.2); return { lean: -0.3 * k, hP: 0.35 * k, aLo: 0.6 * k, aRo: 0.6 * k, aLe: 0.8 * k, aRe: 0.8 * k, y: -0.05 * k }; } },
+  knockout: { dur: 2.8, in: 0.04, out: 0.35, expr: 'sad', f: (t) => { const k = ease(Math.min(1, t * 3.5)); return { lean: -1.45 * k, y: 0.08 * k, aLo: 1.3 * k, aRo: 1.1 * k, aLe: 0.3, aRe: 0.5, lLf: 0.25 * k, lRf: -0.1 * k, lLk: 0.2, hP: 0.3 * k }; } },
   // ---- emote tambahan ----
   salute: { dur: 1.6, in: 0.15, out: 0.25, f: () => ({ aRo: 1.3, aRf: 0.6, aRe: 2.3, aRt: 0.3, hP: -0.05, wLean: -0.05, lLo: 0, lRo: 0 }) },
   flex: { dur: 2.2, in: 0.15, out: 0.3, expr: 'happy', f: (t, T) => { const pump = Math.sin(T * 9); return { aLo: 1.45, aRo: 1.45, aLe: 1.8 + pump * 0.18, aRe: 1.8 + pump * 0.18, aLt: 1.5, aRt: 1.5, y: -0.06, lLo: 0.2, lRo: 0.2, lLk: 0.25, lRk: 0.25, hP: 0.1, hY: Math.sin(T * 3) * 0.3 }; } },
