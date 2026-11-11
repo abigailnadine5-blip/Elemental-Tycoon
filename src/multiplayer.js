@@ -3,13 +3,10 @@
 //   rooms/{room}/players/{uid} = { n, e, x, y, z, r, s, g, ab, c, t }
 //   rooms/{room}/plots/{index} = { owner, name, element, items: { id: true } }
 //   rooms/{room}/chat/{pushId}  = { uid, n, m, t }
-import { firebaseConfig, DEFAULT_ROOM } from '../firebase-config.js';
+import { DEFAULT_ROOM } from '../firebase-config.js';
+import { loadFirebase, firebaseConfigured, ensureGuest } from './account.js';
 
-const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-
-export function firebaseConfigured() {
-  return !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.databaseURL);
-}
+export { firebaseConfigured };
 
 export function offline(reason) {
   return {
@@ -22,16 +19,10 @@ export function offline(reason) {
 export async function createMultiplayer(h = {}) {
   if (!firebaseConfigured()) return offline('Firebase belum diatur (lihat firebase-config.js)');
   try {
-    const [appMod, db, authMod] = await Promise.all([
-      import(SDK + 'firebase-app.js'),
-      import(SDK + 'firebase-database.js'),
-      import(SDK + 'firebase-auth.js'),
-    ]);
-    const app = appMod.initializeApp(firebaseConfig);
-    const auth = authMod.getAuth(app);
-    const cred = await authMod.signInAnonymously(auth);
-    const uid = cred.user.uid;
-    const database = db.getDatabase(app);
+    // pakai akun yang sedang masuk; kalau tamu -> login anonim
+    const fb = await loadFirebase();
+    const db = fb.db, database = fb.database;
+    const uid = await ensureGuest();
 
     const room = (new URLSearchParams(location.search).get('room') || DEFAULT_ROOM || 'main').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'main';
     const base = `rooms/${room}`;

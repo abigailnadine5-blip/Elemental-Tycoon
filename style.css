@@ -241,3 +241,24 @@ body.touch .powerbar { grid-template-columns: auto auto auto; }
 body.touch .power { width: 64px; height: 64px; }
 body.touch #btnAttack { width: 88px; height: 88px; }
 body.touch .touch-btn.jump { right: 250px; }
+
+/* ---------- akun ---------- */
+.auth, .user { display: flex; flex-direction: column; gap: 8px; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(0,0,0,.25); padding: 4px; border-radius: 12px; }
+.tab { font: 900 15px 'Nunito', sans-serif; color: #cfd5ee; background: transparent; border: 0; border-radius: 9px; padding: 9px; cursor: pointer; }
+.tab.on { background: rgba(255,255,255,.14); color: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+#authName, #authPass, #authPass2 { font: 800 17px 'Nunito', sans-serif; color: #fff; background: rgba(255,255,255,.08); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; outline: none; text-align: left; width: 100%; -webkit-user-select: text; user-select: text; }
+#authName:focus, #authPass:focus, #authPass2:focus { border-color: var(--accent); }
+.pass-row { position: relative; }
+.eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: 0; font-size: 18px; cursor: pointer; opacity: .7; }
+.auth-msg { min-height: 18px; font-size: 13px; font-weight: 800; color: #ff8a80; }
+.auth-msg.ok { color: #7dff9b; }
+.user { background: rgba(125,255,155,.08); border: 1px solid rgba(125,255,155,.3); border-radius: 14px; padding: 10px; align-items: center; }
+.user-hi { font-size: 18px; font-weight: 900; }
+.cloud { font-size: 12px; color: #c8ffd4; }
+.guest-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.guest-note a { color: #9ecbff; font-weight: 900; }
+#guestBox { display: flex; flex-direction: column; }
+#guestBox.hidden { display: none; }
+#menu { overflow-y: auto; align-items: safe center; padding: 12px 0; }
+.menu-box { margin: auto; }

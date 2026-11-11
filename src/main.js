@@ -21,6 +21,7 @@ import { makeLabel } from './textures.js';
 import { Input } from './input.js';
 import { sfx } from './audio.js';
 import { createMultiplayer, firebaseConfigured, offline } from './multiplayer.js';
+import { currentAccount, signUp, logIn, logOut, validName, cleanName, authError, loadCloudSaves, saveCloud } from './account.js';
 import { fmt, clamp, damp, lerpAngle, isTouch } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -173,17 +174,32 @@ function remoteMods(el) {
 // Simpan / muat (localStorage)
 // ---------------------------------------------------------------------
 const SAVE_KEY = (id) => `elementalTycoon:v1:${id}`;
-function loadSave(id) { try { return JSON.parse(localStorage.getItem(SAVE_KEY(id)) || 'null'); } catch (e) { return null; } }
+// akun: progres di cloud (users/{uid}/saves); tamu: progres di perangkat (localStorage)
+let account = null, cloudSaves = {};
+function loadSave(id) {
+  if (account) return cloudSaves[id] || null;
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY(id)) || 'null'); } catch (e) { return null; }
+}
 const COSTUME_KEY = (id) => `elementalTycoon:costume:${id}`;
-function loadCostume(id) { try { return localStorage.getItem(COSTUME_KEY(id)) || 'standar'; } catch (e) { return 'standar'; } }
-function saveCostume(id, c) { try { localStorage.setItem(COSTUME_KEY(id), c); } catch (e) { /* */ } }
+function loadCostume(id) {
+  if (account) return (cloudSaves[id] && cloudSaves[id].costume) || 'standar';
+  try { return localStorage.getItem(COSTUME_KEY(id)) || 'standar'; } catch (e) { return 'standar'; }
+}
+function saveCostume(id, c) {
+  if (account) { cloudSaves[id] = { ...(cloudSaves[id] || {}), costume: c }; saveCloud(account.uid, id, cloudSaves[id]); return; }
+  try { localStorage.setItem(COSTUME_KEY(id), c); } catch (e) { /* */ }
+}
 
 function save() {
   if (game.state !== 'playing' || !game.plot) return;
+  const data = { cash: Math.floor(game.cash + game.plot.bank), items: [...game.plot.items], rebirths: game.rebirths, costume: game.costume, t: Date.now() };
+  if (account) {
+    cloudSaves[game.element.id] = data;
+    saveCloud(account.uid, game.element.id, data);
+    return;
+  }
   try {
-    localStorage.setItem(SAVE_KEY(game.element.id), JSON.stringify({
-      cash: game.cash + game.plot.bank, items: [...game.plot.items], rebirths: game.rebirths, t: Date.now(),
-    }));
+    localStorage.setItem(SAVE_KEY(game.element.id), JSON.stringify(data));
     localStorage.setItem('elementalTycoon:name', game.name);
   } catch (e) { /* storage tidak tersedia */ }
 }
@@ -218,6 +234,79 @@ const PREVIEW_POS = new THREE.Vector3(0, 0, 9.5);
 try { $('nameInput').value = localStorage.getItem('elementalTycoon:name') || ''; } catch (e) { /* */ }
 $('netInfo').textContent = firebaseConfigured() ? '🟢 Multiplayer Firebase aktif' : '⚪ Mode offline — isi firebase-config.js untuk multiplayer';
 
+// ---------- AKUN: Masuk / Daftar / Tamu ----------
+let authMode = 'login';
+function menuMode(mode) { // 'auth' | 'guest' | 'user' | 'offline'
+  $('authBox').classList.toggle('hidden', mode !== 'auth');
+  $('userBox').classList.toggle('hidden', mode !== 'user');
+  $('guestBox').classList.toggle('hidden', !(mode === 'guest' || mode === 'offline'));
+  $('toAuth').parentElement.querySelector('a').style.display = mode === 'offline' ? 'none' : '';
+  $('startBtn').classList.toggle('hidden', mode === 'auth');
+}
+function setAuthTab(mode) {
+  authMode = mode;
+  $('tabLogin').classList.toggle('on', mode === 'login');
+  $('tabSignup').classList.toggle('on', mode === 'signup');
+  $('authPass2').classList.toggle('hidden', mode !== 'signup');
+  $('authPass').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  $('authBtn').textContent = mode === 'signup' ? '✨ DAFTAR AKUN' : '🔑 MASUK';
+  $('authMsg').textContent = '';
+}
+async function enterAccount(acc) {
+  account = acc;
+  $('authMsg').className = 'auth-msg ok'; $('authMsg').textContent = '☁️ Memuat progres...';
+  try { cloudSaves = await loadCloudSaves(acc.uid); } catch (e) { cloudSaves = {}; console.warn(e); }
+  $('authMsg').className = 'auth-msg'; $('authMsg').textContent = '';
+  $('userName').textContent = acc.name;
+  menuMode('user');
+}
+async function initAccount() {
+  if (!firebaseConfigured()) { menuMode('offline'); return; }
+  menuMode('auth');
+  $('authMsg').className = 'auth-msg ok'; $('authMsg').textContent = 'Memeriksa akun...';
+  try {
+    const acc = await currentAccount();
+    $('authMsg').textContent = '';
+    if (acc) await enterAccount(acc);
+  } catch (e) {
+    $('authMsg').className = 'auth-msg'; $('authMsg').textContent = 'Tidak bisa terhubung ke server akun. Kamu tetap bisa main sebagai Tamu.';
+  }
+}
+$('tabLogin').onclick = () => setAuthTab('login');
+$('tabSignup').onclick = () => setAuthTab('signup');
+$('showPass').onclick = () => { const t = $('authPass').type === 'password' ? 'text' : 'password'; $('authPass').type = t; $('authPass2').type = t; };
+$('authBtn').onclick = async () => {
+  sfx.unlock();
+  const name = cleanName($('authName').value), pass = $('authPass').value;
+  const msg = (t) => { $('authMsg').className = 'auth-msg'; $('authMsg').textContent = t; };
+  if (!validName(name)) return msg('Nama 3–16 karakter: huruf, angka, atau _ (tanpa spasi).');
+  if (pass.length < 6) return msg('Password minimal 6 karakter.');
+  if (authMode === 'signup' && pass !== $('authPass2').value) return msg('Password dan ulangi password tidak sama.');
+  $('authBtn').disabled = true;
+  $('authMsg').className = 'auth-msg ok'; $('authMsg').textContent = authMode === 'signup' ? 'Membuat akun...' : 'Masuk...';
+  try {
+    const acc = authMode === 'signup' ? await signUp(name, pass) : await logIn(name, pass);
+    $('authPass').value = ''; $('authPass2').value = '';
+    await enterAccount(acc);
+    toast(authMode === 'signup' ? `✨ Akun ${acc.name} berhasil dibuat!` : `👋 Selamat datang kembali, ${acc.name}!`, '#7dff9b');
+    sfx.buy();
+  } catch (e) {
+    msg(authError(e));
+    sfx.error();
+  } finally { $('authBtn').disabled = false; }
+};
+for (const id of ['authName', 'authPass', 'authPass2']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('authBtn').click(); });
+$('guestBtn').onclick = () => { sfx.click(); menuMode('guest'); };
+$('toAuth').onclick = (e) => { e.preventDefault(); menuMode('auth'); };
+$('logoutBtn').onclick = async () => {
+  try { await logOut(); } catch (e) { /* */ }
+  account = null; cloudSaves = {};
+  setAuthTab('login');
+  menuMode('auth');
+  toast('Kamu sudah keluar dari akun', '#cfd5ee');
+};
+initAccount();
+
 function buildCards() {
   const grid = $('elementGrid');
   grid.innerHTML = '';
@@ -231,7 +320,7 @@ function buildCards() {
       <div class="el-icon">${el.icon}</div>
       <div class="el-name">${el.name}</div>
       <div class="el-pass">${el.passiveText}</div>
-      ${s ? `<div class="el-save">💾 ${fmt(s.cash)}${s.rebirths ? ' · ♻' + s.rebirths : ''}</div>` : ''}`;
+      ${s && typeof s.cash === 'number' ? `<div class="el-save">${account ? '☁️' : '💾'} ${fmt(s.cash)}${s.rebirths ? ' · ♻' + s.rebirths : ''}</div>` : ''}`;
     card.onclick = () => selectElement(el, card);
     grid.appendChild(card);
   }
@@ -289,8 +378,8 @@ function show(id) {
 
 $('startBtn').onclick = () => {
   sfx.unlock(); sfx.click();
-  game.name = ($('nameInput').value.trim() || 'Player' + Math.floor(Math.random() * 1000)).slice(0, 16);
-  $('nameInput').value = game.name;
+  game.name = account ? account.name : ($('nameInput').value.trim() || 'Tamu' + Math.floor(Math.random() * 1000)).slice(0, 16);
+  if (!account) $('nameInput').value = game.name;
   buildCards();
   game.state = 'select';
   show('select');
@@ -499,7 +588,7 @@ async function startGame(el) {
   mp = await createMultiplayer(handlers);
   if (!mp.online && firebaseConfigured()) setTimeout(() => toast('⚠️ Multiplayer gagal: ' + mp.reason, '#ffcc80'), 2500);
   const s = loadSave(el.id);
-  game.cash = s ? s.cash : START_CASH;
+  game.cash = s && typeof s.cash === 'number' ? s.cash : START_CASH;
   game.rebirths = s ? s.rebirths || 0 : 0;
   const items = validItems(s ? s.items : []);
 

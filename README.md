@@ -23,7 +23,8 @@ Dibuat dengan [Three.js](https://threejs.org) (tanpa build step) dan siap **mult
 - Grafik "realistis": langit fisik, bayangan lembut, refleksi lingkungan (PBR), bloom/glow, kabut, pohon & gunung
 - Gameplay tycoon klasik: **Dropper → Conveyor → Upgrader → Collector → Pad Uang**
 - 29 bangunan yang bisa dibeli + **Rebirth** (bonus pendapatan permanen +50%)
-- Progres **tersimpan otomatis** (localStorage) per elemen
+- **👤 Akun pemain (Nama + Password, tanpa Google)**: Daftar sekali, lalu Masuk di perangkat mana pun dengan nama & password yang sama — progres (uang, bangunan, rebirth, kostum) **tersimpan di cloud** per elemen. Bisa juga **Main sebagai Tamu** (progres hanya di perangkat itu)
+- Progres tamu **tersimpan otomatis** (localStorage) per elemen
 - Kontrol PC (keyboard + mouse) & HP (joystick virtual + tombol)
 - **Multiplayer (Firebase)**: maks 4 pemain per room, lihat pemain & markas orang lain secara realtime, chat, leaderboard
 
@@ -121,7 +122,7 @@ Selama `firebase-config.js` masih kosong, game berjalan **offline / single playe
 
 1. Buka [Firebase Console](https://console.firebase.google.com) → **Add project**.
 2. **Build → Realtime Database → Create database** (pilih lokasi terdekat, misal `asia-southeast1`).
-3. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable**.
+3. **Build → Authentication → Get started → Sign-in method** → aktifkan **Anonymous** (untuk tamu) **dan Email/Password** (untuk akun Nama+Password).
 4. **Project settings (⚙) → Your apps → Web (`</>`)** → daftarkan app → salin objek `firebaseConfig`.
 5. Tempel ke `firebase-config.js` (pastikan `databaseURL` terisi!).
 6. Di **Realtime Database → Rules**, tempel isi file [`database.rules.json`](database.rules.json) → **Publish**.
@@ -139,6 +140,8 @@ Selama `firebase-config.js` masih kosong, game berjalan **offline / single playe
 rooms/{room}/players/{uid}  = { n, e, x, y, z, r, s, g, ab, c, u, pq, pd, t } // posisi, status, ultimate & serangan (10x/detik)
 rooms/{room}/plots/{0..3}   = { owner, name, element, items: {...} } // markas yang sudah diklaim
 rooms/{room}/chat/{pushId}  = { uid, n, m, t }                       // pesan chat
+users/{uid}/profile          = { name, created }                      // akun
+users/{uid}/saves/{elemen}   = { cash, items, rebirths, costume, t }  // progres di cloud
 ```
 
 Data pemain & plot otomatis terhapus saat pemain keluar (`onDisconnect`).
@@ -167,6 +170,7 @@ src/
   particles.js        sistem partikel & efek (petir, gelombang kejut)
   powers.js           serangan [Q] (proyektil & sinar) + Kristal Elemen
   skills.js           24 jurus [Z]/[X] + ledakan ultimate
+  account.js          akun Nama+Password & simpanan cloud
   multiplayer.js      integrasi Firebase (auth anonim, realtime database)
   input.js            keyboard, mouse, joystick sentuh
   audio.js            efek suara sintetis (WebAudio)
