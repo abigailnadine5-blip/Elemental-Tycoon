@@ -77,7 +77,18 @@ export class SkillSystem {
     this.zones = []; this.timers = []; this.walls = [];
   }
 
-  later(t, fn) { this.timers.push({ t, fn }); }
+  later(t, fn, owner = null) { this.timers.push({ t, fn, owner }); }
+
+  // buang semua jurus milik pemain lain yang masih berjalan (dipakai saat kembali ke tab game)
+  purgeRemote() {
+    this.timers = this.timers.filter((tm) => !tm.owner || tm.owner.local);
+    for (let i = this.zones.length - 1; i >= 0; i--) {
+      const z = this.zones[i];
+      if (z.owner.local) continue;
+      for (const o of z.objs) { this.scene.remove(o); o.traverse((m) => { m.geometry?.dispose(); m.material?.dispose?.(); }); }
+      this.zones.splice(i, 1);
+    }
+  }
 
   // owner: { local, id, name, el, ult }
   cast(owner, slot, pos, dir, aim) {
@@ -92,7 +103,7 @@ export class SkillSystem {
           const at = aim.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
           const t = sk.delay + i * sk.interval;
           this.strikeVisual(sk.vis, el, at, t);
-          this.later(t, () => this.impact(owner, at, sk.radius, sk.dmg, {}, sk));
+          this.later(t, () => this.impact(owner, at, sk.radius, sk.dmg, {}, sk), owner);
         }
         break;
       }
@@ -101,7 +112,7 @@ export class SkillSystem {
         if (sk.vis === 'roots') this.rootsVisual(at, sk.radius);
         else if (sk.vis === 'iceprison') this.iceVisual(at, sk.radius);
         else { this.elFx.skill(el, at); this.fx.shockwave(at, el.color, sk.radius * 1.6); }
-        this.later(sk.delay || 0, () => this.impact(owner, at, sk.radius, sk.dmg, { root: sk.root, freeze: sk.freeze, knock: sk.knock }, sk));
+        this.later(sk.delay || 0, () => this.impact(owner, at, sk.radius, sk.dmg, { root: sk.root, freeze: sk.freeze, knock: sk.knock }, sk), owner);
         break;
       }
       case 'zone': {
@@ -128,7 +139,7 @@ export class SkillSystem {
             }
           }
           this.fx.shockwave(src, 0xffea00, 6);
-        });
+        }, owner);
         break;
       }
       case 'drone': {

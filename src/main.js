@@ -80,7 +80,7 @@ const skillSys = new SkillSystem(scene, particles, effects, elFx, {
   predict: (e, amount, status) => { const r = remotes.get(e.id); if (r) predictDamage(r, amount, status); },
   enemies: (owner) => {
     const out = [];
-    for (const r of remotes.values()) if (!r.dead && r.id !== owner.id && r.avatar.root.visible !== null) out.push({ id: r.id, pos: r.avatar.root.position });
+    for (const r of remotes.values()) if (!r.dead && !r.stale && r.id !== owner.id) out.push({ id: r.id, pos: r.avatar.root.position });
     return out;
   },
   anchor: (id) => (id === mp.id ? player.avatar?.root : remotes.get(id)?.avatar.root) || null,
@@ -189,6 +189,24 @@ function save() {
 }
 setInterval(save, 5000);
 addEventListener('beforeunload', () => { save(); mp.leave(); });
+addEventListener('pagehide', () => { save(); mp.leave(); });
+
+// Tab/aplikasi disembunyikan -> tandai "away" (tidak bisa diserang). Kembali -> buang serangan yang menumpuk + perlindungan.
+document.addEventListener('visibilitychange', () => {
+  if (game.state !== 'playing') return;
+  if (document.hidden) {
+    game.away = true;
+    sendState(true);
+    save();
+  } else {
+    game.away = false;
+    powers.purgeRemote();
+    skillSys.purgeRemote();
+    game.hitCd = 0.5;
+    game.spawnProt = game.t + 3;
+    sendState(true);
+  }
+});
 
 // ---------------------------------------------------------------------
 // UI: Menu & pilih elemen
@@ -337,6 +355,8 @@ addEventListener('keydown', (e) => {
 const handlers = {
   onPlayer(id, d) {
     if (!d || typeof d.x !== 'number') return;
+    // saat tab game tersembunyi, serangan TIDAK disimulasikan (supaya tidak menumpuk lalu kena sekaligus)
+    const live = !document.hidden && !game.away;
     const el = getElement(d.e);
     let r = remotes.get(id);
     if (r && (r.el.id !== el.id || r.k !== (d.k || 'standar'))) { removeRemote(id); r = null; }
@@ -352,8 +372,13 @@ const handlers = {
       r.hpBar.sprite.position.y = 3.85;
       av.root.add(r.hpBar.sprite);
       remotes.set(id, r);
+      r.seen = performance.now();
+      reapplyPlots(id);
       if (game.state === 'playing') toast(`👋 ${d.n || 'Pemain'} (${el.name}) bergabung`, hex(el.glow));
     }
+    r.seen = performance.now();
+    if (r.stale) { r.stale = false; reapplyPlots(id); }
+    r.aw = !!d.aw;
     r.target.set(d.x, d.y, d.z);
     r.ry = d.r || 0; r.s = d.s || 0; r.g = !!d.g; r.c = d.c || 0; r.sw = !!d.sw;
     // ---- PvP dari pemain lain ----
@@ -370,11 +395,13 @@ const handlers = {
       const P = new THREE.Vector3(d.sk.p[0], d.sk.p[1], d.sk.p[2]);
       const D = new THREE.Vector3(d.sk.d[0], 0, d.sk.d[1]);
       const A = new THREE.Vector3(d.sk.a[0], d.sk.a[1], d.sk.a[2]);
-      if (d.sk.i === 'slam') skillSys.slam(owner, P);
-      else { skillSys.cast(owner, d.sk.i, P, D, A); r.avatar.play(d.sk.i === 'x' ? 'skill' : 'castDash'); }
+      if (live) {
+        if (d.sk.i === 'slam') skillSys.slam(owner, P);
+        else { skillSys.cast(owner, d.sk.i, P, D, A); r.avatar.play(d.sk.i === 'x' ? 'skill' : 'castDash'); }
+      }
     }
     r.bf = d.bf || '';
-    r.avatar.root.visible = !r.bf.includes('invis');
+    r.avatar.root.visible = !r.bf.includes('invis') && !r.stale;
     setBubble(r, r.bf);
     if (d.kl && d.kl.s !== r.klSeq) {
       r.klSeq = d.kl.s;
@@ -396,7 +423,7 @@ const handlers = {
       r.pq = d.pq;
       if (Array.isArray(d.pd) && d.pd.length === 6) {
         r.avatar.attack();
-        powers.fire({ local: false, el, name: r.n || 'Pemain', id }, new THREE.Vector3(d.pd[0], d.pd[1], d.pd[2]), new THREE.Vector3(d.pd[3], d.pd[4], d.pd[5]).normalize(), powerWorld);
+        if (live) powers.fire({ local: false, el, name: r.n || 'Pemain', id }, new THREE.Vector3(d.pd[0], d.pd[1], d.pd[2]), new THREE.Vector3(d.pd[3], d.pd[4], d.pd[5]).normalize(), powerWorld);
       }
     }
     updateLeaderboard();
@@ -408,6 +435,7 @@ const handlers = {
     updateLeaderboard();
   },
   onPlot(i, data) {
+    plotCache[i] = data;
     const plot = plots[i];
     if (!plot || i === game.plotIndex) return;
     if (!data) { plot.clearOwner(); return; }
@@ -424,6 +452,17 @@ const handlers = {
   },
 };
 
+// cache data markas, supaya bisa ditampilkan lagi saat pemiliknya kembali aktif
+const plotCache = {};
+function reapplyPlots(id) {
+  for (const [i, data] of Object.entries(plotCache)) {
+    if (data && data.owner === id && Number(i) !== game.plotIndex) plots[i].applyRemote(data, getElement(data.element));
+  }
+}
+function hidePlotsOf(id) {
+  for (const p of plots) if (p.owner === id && p !== game.plot) p.clearOwner();
+}
+
 function removeRemote(id) {
   const r = remotes.get(id);
   if (!r) return;
@@ -433,7 +472,7 @@ function removeRemote(id) {
 
 function updateLeaderboard() {
   const rows = [{ n: game.name + ' (kamu)', c: game.cash, k: game.kills, col: hex(game.element?.glow || 0xffffff) }];
-  for (const r of remotes.values()) rows.push({ n: r.n || 'Pemain', c: r.c, k: r.kc || 0, col: hex(r.el.glow) });
+  for (const r of remotes.values()) if (!r.stale) rows.push({ n: (r.n || 'Pemain') + (r.aw ? ' 💤' : ''), c: r.c, k: r.kc || 0, col: hex(r.el.glow) });
   rows.sort((a, b) => b.c - a.c);
   $('leaderboard').innerHTML = `<div class="lb-title">🏆 Pemain (${rows.length})</div>` +
     rows.slice(0, 8).map((r) => `<div class="lb-row"><span style="color:${r.col}">${escapeHtml(r.n)}</span><i>⚔${r.k}</i><b>${fmt(r.c)}</b></div>`).join('');
@@ -727,7 +766,7 @@ const powerWorld = {
     const t = [];
     if (owner.local) {
       for (const cr of crystals.items) t.push({ pos: cr.pos, r: 1.0, hit: () => crystals.break(cr) });
-      for (const r of remotes.values()) if (!r.dead) t.push({ pos: r.center || (r.center = new THREE.Vector3()), r: 1.0, hit: (dir, a) => predictHit(r, a) });
+      for (const r of remotes.values()) if (!r.dead && !r.stale) t.push({ pos: r.center || (r.center = new THREE.Vector3()), r: 1.0, hit: (dir, a) => predictHit(r, a) });
     } else if (game.state === 'playing') {
       playerCenter.copy(player.pos).y += 1.3;
       if (!game.dead) t.push({ pos: playerCenter, r: 1.0, hit: (dir, a) => getHit(dir, owner, a) });
@@ -746,7 +785,7 @@ function damageOf(a, attackerUlt) { return Math.round((a.dmg || 10) * (attackerU
 
 // serangan kita mengenai pemain lain (tampilan saja; pengurangan HP dihitung di HP korban)
 function predictHit(r, a) {
-  if (!game.pvp || !r.pv || r.sp || remoteInOwnBase(r)) { effects.shockwave(r.avatar.root.position, 0x80d8ff, 2.5); return; }
+  if (!canHitRemote(r)) { effects.shockwave(r.avatar.root.position, 0x80d8ff, 2.5); return; }
   r.avatar.play('hurt');
   floatText(tmpW.copy(r.avatar.root.position).setY(r.avatar.root.position.y + 3.2), '-' + Math.round((a.dmg || 10) * (ultActive() ? 1.5 : 1) * (r.u ? 0.7 : 1)), '#ff6b6b');
 }
@@ -766,7 +805,7 @@ function buffDamageMult() {
 
 // semua damage ke diri sendiri lewat sini (serangan Q, jurus area, ledakan ultimate)
 function applyDamage(amount, owner, dir, status) {
-  if (game.dead || game.state !== 'playing') return;
+  if (game.dead || game.state !== 'playing' || document.hidden || game.away) return;
   if (!status.small && game.hitCd > 0) return;
   if (!status.small) game.hitCd = 0.3;
   const r = remotes.get(owner.id);
@@ -803,7 +842,7 @@ function applyDamage(amount, owner, dir, status) {
 }
 
 // prediksi damage di pemain lain (hanya tampilan)
-function canHitRemote(r) { return game.pvp && r.pv && !r.sp && !r.dead && !remoteInOwnBase(r); }
+function canHitRemote(r) { return game.pvp && r.pv && !r.sp && !r.aw && !r.stale && !r.dead && !remoteInOwnBase(r); }
 function predictDamage(r, amount, status = {}) {
   if (!canHitRemote(r)) { effects.shockwave(r.avatar.root.position, 0x80d8ff, 2); return; }
   if (r.bf.includes('hexshield')) { effects.shockwave(tmpW.copy(r.avatar.root.position).setY(r.avatar.root.position.y + 1), 0x00e5ff, 2.5); return; }
@@ -1188,7 +1227,13 @@ function updateCamera(dt) {
 }
 
 function updateRemotes(dt) {
-  for (const r of remotes.values()) {
+  const now = performance.now();
+  for (const r of [...remotes.values()]) {
+    // pemain yang tidak mengirim data: sembunyikan (12 dtk), lalu hapus (60 dtk)
+    const age = now - (r.seen || now);
+    if (age > 60000) { hidePlotsOf(r.id); removeRemote(r.id); updateLeaderboard(); continue; }
+    if (age > 12000 && !r.stale) { r.stale = true; r.avatar.root.visible = false; hidePlotsOf(r.id); updateLeaderboard(); }
+    if (r.stale) continue;
     const root = r.avatar.root;
     root.position.x = damp(root.position.x, r.target.x, 12, dt);
     root.position.y = damp(root.position.y, r.target.y, 12, dt);
@@ -1210,6 +1255,7 @@ function sendState(force = false) {
     r: +player.facing.toFixed(2), s: +player.speed.toFixed(2), g: !player.onGround,
     ab: game.abCount, c: Math.floor(game.cash), u: ultActive() ? 1 : 0, pq: game.pq,
     k: game.costume, em: game.em, sw: player.swimming ? 1 : 0,
+    aw: game.away ? 1 : 0,
     hp: Math.round(game.hp), pv: game.pvp ? 1 : 0, dead: game.dead ? 1 : 0, sp: game.t < game.spawnProt ? 1 : 0, kc: game.kills,
   };
   if (game.pd) st.pd = game.pd;
@@ -1323,4 +1369,6 @@ game.player = player;
 game._handlers = handlers; // untuk debug/tes multiplayer
 game._scene = scene;
 game._skills = skillSys;
+game._remotes = remotes;
+game._plots = plots;
 game.setHour = (h) => (h == null ? world.clearHour() : world.setHour(h)); // contoh: game.setHour(20)

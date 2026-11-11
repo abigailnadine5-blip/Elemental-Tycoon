@@ -92,6 +92,14 @@ export class Powers {
     this.explode({ owner, a: { ...a, explode: 1.2 } }, end, world);
   }
 
+  purgeRemote() {
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      if (this.list[i].owner.local) continue;
+      this.scene.remove(this.list[i].mesh);
+      this.list.splice(i, 1);
+    }
+  }
+
   explode(pr, pos, world) {
     const el = pr.owner.el, a = pr.a;
     const big = a.explode || 1;

@@ -51,8 +51,31 @@ export async function createMultiplayer(h = {}) {
     const chatQuery = db.query(db.ref(database, `${base}/chat`), db.limitToLast(15));
     db.onChildAdded(chatQuery, (s) => h.onChat?.(s.val()));
 
+    // markas yang kita klaim (disimpan agar bisa diklaim ulang setelah koneksi putus-sambung)
+    let claimed = null;
+    const plotRef = (i) => db.ref(database, `${base}/plots/${i}`);
+    async function reclaim() {
+      if (!claimed) return;
+      try {
+        const res = await db.runTransaction(plotRef(claimed.i), (cur) => {
+          if (cur === null || cur.owner === uid) return { ...claimed.data, owner: uid };
+          return undefined;
+        });
+        if (res.committed) db.onDisconnect(plotRef(claimed.i)).remove();
+      } catch (e) { console.warn('reclaim', e); }
+    }
+
+    // Setiap kali (kembali) tersambung: daftarkan ulang "hapus saat keluar" & pulihkan markas.
+    // onDisconnect hanya berlaku sekali, jadi tanpa ini pemain bisa jadi "hantu" setelah koneksi putus sebentar.
     const connRef = db.ref(database, '.info/connected');
-    db.onValue(connRef, (s) => h.onConnection?.(!!s.val()));
+    db.onValue(connRef, (s) => {
+      const ok = !!s.val();
+      if (ok) {
+        db.onDisconnect(meRef).remove();
+        reclaim();
+      }
+      h.onConnection?.(ok);
+    });
 
     let lastSend = 0;
     return {
@@ -67,6 +90,7 @@ export async function createMultiplayer(h = {}) {
             });
             if (res.committed) {
               db.onDisconnect(ref).remove();
+              claimed = { i, data: { ...data } };
               return i;
             }
           } catch (e) { console.warn('claimPlot', i, e); }
@@ -74,7 +98,9 @@ export async function createMultiplayer(h = {}) {
         return -1;
       },
       updatePlot(i, data) {
-        db.update(db.ref(database, `${base}/plots/${i}`), data).catch((e) => console.warn(e));
+        // selalu tulis data lengkap + owner, supaya tetap diterima walau markas sempat terhapus
+        claimed = { i, data: { ...(claimed && claimed.i === i ? claimed.data : {}), ...data } };
+        db.set(plotRef(i), { ...claimed.data, owner: uid }).catch((e) => { console.warn(e); reclaim(); });
       },
       sendState(state, force = false) {
         const now = performance.now();
@@ -85,7 +111,11 @@ export async function createMultiplayer(h = {}) {
       sendChat(name, text) {
         db.push(db.ref(database, `${base}/chat`), { uid, n: String(name).slice(0, 20), m: String(text).slice(0, 120), t: db.serverTimestamp() }).catch((e) => console.warn(e));
       },
-      leave() { db.remove(meRef).catch(() => {}); },
+      leave() {
+        db.remove(meRef).catch(() => {});
+        if (claimed) db.remove(plotRef(claimed.i)).catch(() => {});
+        claimed = null;
+      },
     };
   } catch (e) {
     console.error(e);
